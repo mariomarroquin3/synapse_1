@@ -94,9 +94,9 @@ def update_last_login(user_id: int) -> None:
     print("[DEBUG] Actualizando último login...")
 
     query = """
-        UPDATE user
+        UPDATE [user]
         SET updated_at = Now()
-        WHERE id = ?
+        WHERE Id_user = ?
     """
 
     with get_cursor(commit=True) as cursor:
