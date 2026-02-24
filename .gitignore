@@ -1,0 +1,67 @@
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos compilados
+*.so
+*.pyd
+*.dll
+
+# Entornos virtuales
+venv/
+env/
+.venv/
+ENV/
+
+# ==========================
+# Variables de entorno
+# ==========================
+.env
+.env.*
+!.env.example
+
+# ==========================
+# Archivos de base de datos
+# ==========================
+*.db
+*.sqlite3
+*.accdb
+*.mdb
+
+# ==========================
+# Logs
+# ==========================
+*.log
+
+# ==========================
+# VS Code
+# ==========================
+.vscode/
+
+# ==========================
+# Archivos del sistema
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# Archivos temporales
+# ==========================
+*.tmp
+*.bak
+*.swp
+
+# ==========================
+# Pytest / coverage (por si agregas testing)
+# ==========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ==========================
+# Streamlit (si lo estás usando)
+# ==========================
+.streamlit/secrets.toml
