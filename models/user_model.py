@@ -1,6 +1,5 @@
 from config.database import get_cursor
 
-
 def create_user(role_id: int,
                 email: str,
                 password_hash: str,
@@ -75,6 +74,30 @@ def get_user_by_email(email: str):
         return row
 
 
+def get_user_by_dui(dui: str):
+    """
+    Retorna un usuario por DUI.
+    Útil para validar duplicados antes de insertar.
+    """
+    print(f"[DEBUG] Buscando usuario por DUI: {dui}")
+    query = "SELECT * FROM user WHERE DUI = ?"
+    with get_cursor() as cursor:
+        cursor.execute(query, (dui,))
+        return cursor.fetchone()
+
+
+def get_user_by_phone(phone_number: str):
+    """
+    Retorna un usuario por número de teléfono.
+    Útil para validar duplicados antes de insertar.
+    """
+    print(f"[DEBUG] Buscando usuario por teléfono: {phone_number}")
+    query = "SELECT * FROM user WHERE phone_number = ?"
+    with get_cursor() as cursor:
+        cursor.execute(query, (phone_number,))
+        return cursor.fetchone()
+
+
 def get_user_by_id(user_id: int):
     """
     Retorna un usuario por ID.
@@ -99,8 +122,8 @@ def update_last_login(user_id: int) -> None:
     query = """
         UPDATE [user]
         SET updated_at = Now()
-        WHERE Id_user = ?
-    """
+        WHERE id = ?
+    """ # Se corrigió Id_user a id para consistencia con get_user_by_id
 
     with get_cursor(commit=True) as cursor:
         cursor.execute(query, (user_id,))
