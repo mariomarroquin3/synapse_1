@@ -1,19 +1,36 @@
 import streamlit as st
 import sys
 import os
+import re
+import time
 
-# --- FIX DE RUTAS PARA DETECTAR MÓDULOS ---
-# Agrega la carpeta raíz (synapse_1) al sistema de búsqueda de Python
+# --- FIX DE RUTAS ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from models.user_model import create_user, get_user_by_email
+# Se importan las nuevas funciones de búsqueda para validaciones específicas
+from models.user_model import create_user, get_user_by_email, get_user_by_dui, get_user_by_phone
 from utils.security import hash_password, verify_password
 
-st.set_page_config(page_title="Sistema Bancario - Synapse", page_icon="🏦")
+st.set_page_config(page_title="Synapse 1.0 - Banking System", page_icon="🏦", layout="centered")
+
+# --- FUNCIONES DE LIMPIEZA Y VALIDACIÓN (TIEMPO REAL) ---
+def clean_numeric_input(key):
+    """Elimina cualquier carácter no numérico en tiempo real."""
+    value = st.session_state[key]
+    clean_value = "".join(filter(str.isdigit, value))
+    if value != clean_value:
+        st.session_state[key] = clean_value
+
+def clean_name_input(key):
+    """Elimina números y símbolos del nombre en tiempo real."""
+    value = st.session_state[key]
+    clean_value = "".join(re.findall(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]', value))
+    if value != clean_value:
+        st.session_state[key] = clean_value
 
 st.title("Welcome to Synapse 1.0")
 
-# Creamos las pestañas para Login y Registro
+# Pestañas principales
 tab1, tab2 = st.tabs(["Iniciar Sesión", "Registrarse"])
 
 # --- SECCIÓN DE LOGIN ---
@@ -22,64 +39,102 @@ with tab1:
     with st.form("login_form"):
         login_email = st.text_input("Correo Electrónico")
         login_password = st.text_input("Contraseña", type="password")
-        submit_login = st.form_submit_button("Entrar")
+        submit_login = st.form_submit_button("Entrar", use_container_width=True)
 
     if submit_login:
-        user = get_user_by_email(login_email)
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         
-        if user:
-            # Acceso dinámico a columnas de pyodbc Row
-            db_password_hash = user.password_hash 
-            db_full_name = user.full_name
-            
-            if verify_password(login_password, db_password_hash):
-                st.success(f"Bienvenido de nuevo, {db_full_name}")
-                st.session_state["logged_in"] = True
-                st.session_state["user_email"] = login_email
-            else:
-                st.error("Contraseña incorrecta.")
+        # 1. Validar formato de correo
+        if not re.match(email_regex, login_email):
+            st.error("❌ Por favor, ingresa un correo electrónico válido.")
         else:
-            st.error("Usuario no encontrado.")
-
+            # 2. Buscar si el usuario existe
+            user = get_user_by_email(login_email)
+            
+            if not user:
+                # Si no se encuentra el correo en la base de datos
+                st.error("❌ El correo electrónico no está registrado.")
+            else:
+                # 3. El correo es correcto, ahora validamos la contraseña
+                if verify_password(login_password, user.password_hash):
+                    st.success(f"¡Bienvenido de nuevo, {user.full_name}!")
+                    st.session_state["logged_in"] = True
+                    # Aquí puedes redirigir al usuario si lo deseas
+                else:
+                    # Mensaje específico solicitado
+                    st.error("❌ Contraseña inválida.")
+                    
 # --- SECCIÓN DE REGISTRO ---
 with tab2:
     st.header("Crear Cuenta")
-    with st.form("register_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            new_name = st.text_input("Nombre Completo")
-            new_email = st.text_input("Correo Electrónico")
-            new_dui = st.text_input("DUI (ej: 00000000-0)")
-            new_nit = st.text_input("NIT (opcional)") # CAMBIO: Añadido NIT
-        with col2:
-            new_phone = st.text_input("Teléfono")
-            new_pass = st.text_input("Contraseña", type="password")
-            confirm_pass = st.text_input("Confirmar Contraseña", type="password")
-            
-        submit_reg = st.form_submit_button("Registrar Usuario")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        new_name = st.text_input("Nombre Completo", key="reg_name", on_change=clean_name_input, args=("reg_name",))
+        new_email = st.text_input("Correo Electrónico", key="reg_email")
+        
+        # DUI con limpieza de letras automática
+        raw_dui = st.text_input("DUI (solo números)", max_chars=9, key="reg_dui", on_change=clean_numeric_input, args=("reg_dui",))
+        dui_ready = f"{raw_dui[:8]}-{raw_dui[8:]}" if len(raw_dui) == 9 else ""
+        if dui_ready: st.caption(f"✅ Formato: {dui_ready}")
 
-    if submit_reg:
-        if new_pass != confirm_pass:
-            st.warning("Las contraseñas no coinciden.")
-        elif not new_email or not new_dui or not new_name:
-            st.warning("Nombre, Correo y DUI son obligatorios.")
+    with col2:
+        # Teléfono con limpieza de letras automática
+        raw_phone = st.text_input("Teléfono (solo números)", max_chars=8, key="reg_phone", on_change=clean_numeric_input, args=("reg_phone",))
+        phone_ready = f"{raw_phone[:4]}-{raw_phone[4:]}" if len(raw_phone) == 8 else ""
+        if phone_ready: st.caption(f"✅ Formato: {phone_ready}")
+
+        new_pass = st.text_input("Contraseña", type="password", key="reg_pass")
+        confirm_pass = st.text_input("Confirmar Contraseña", type="password", key="reg_confirm")
+
+    selected_gender = st.selectbox("Género", ["Masculino", "Femenino"], key="reg_gender")
+    gender_letter = "M" if selected_gender == "Masculino" else "F"
+
+    if st.button("Registrar Usuario", use_container_width=True):
+        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        
+        if not re.match(email_regex, new_email):
+            st.error("❌ Por favor, ingresa un correo electrónico válido.")
+        elif len(raw_dui) != 9 or len(raw_phone) != 8:
+            st.error("❌ El DUI o el Teléfono están incompletos.")
+        elif not new_name:
+            st.error("❌ El nombre completo es obligatorio.")
+        elif new_pass != confirm_pass:
+            st.warning("⚠️ Las contraseñas no coinciden.")
+        elif len(new_pass) < 6:
+            st.warning("⚠️ La contraseña debe tener al menos 6 caracteres.")
         else:
             try:
+                # --- VALIDACIONES DE DUPLICADOS PASO A PASO ---
+                # Se verifica el correo
                 if get_user_by_email(new_email):
-                    st.error("Este correo ya está registrado.")
+                    st.error(f"❌ El correo '{new_email}' ya está registrado.")
+                
+                # Se verifica el DUI
+                elif get_user_by_dui(dui_ready):
+                    st.error(f"❌ El DUI '{dui_ready}' ya está registrado.")
+                
+                # Se verifica el teléfono
+                elif get_user_by_phone(phone_ready):
+                    st.error(f"❌ El número de teléfono '{phone_ready}' ya está registrado.")
+                
                 else:
+                    # Si no hay duplicados, se procede al registro
                     hashed = hash_password(new_pass)
-                    # CAMBIO: Ahora pasamos nit e is_active (que por defecto es True)
                     create_user(
                         role_id=2, 
-                        email=new_email,
+                        email=new_email, 
                         password_hash=hashed,
-                        nit=new_nit if new_nit else None, # Enviamos el NIT
-                        dui=new_dui,
+                        nit=None, 
+                        dui=dui_ready, 
                         full_name=new_name,
-                        phone_number=new_phone if new_phone else None
-                        # is_active usa su valor por defecto True en la función
+                        gender=gender_letter, 
+                        phone_number=phone_ready
                     )
-                    st.success("¡Usuario creado con éxito! Ya puedes iniciar sesión.")
+                    st.success("✅ ¡Registro exitoso! Redirigiendo...")
+                    st.balloons()
+                    time.sleep(2)
+                    st.rerun() # Redirige al estado inicial (Login)
+                    
             except Exception as e:
-                st.error(f"Error al registrar: {e}")
+                st.error(f"❌ Error inesperado: {e}")
