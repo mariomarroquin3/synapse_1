@@ -65,3 +65,4 @@ htmlcov/
 # Streamlit (si lo estás usando)
 # ==========================
 .streamlit/secrets.toml
+database/BancoDataBase.laccdb
