@@ -7,6 +7,7 @@ def create_user(role_id: int,
                 nit: str | None,
                 dui: str,
                 full_name: str,
+                gender: str,
                 phone_number: str | None,
                 is_active: bool = True) -> None:
     """
@@ -24,12 +25,13 @@ def create_user(role_id: int,
             NIT,
             DUI,
             full_name,
+            gender,
             phone_number,
             created_at,
             updated_at,
             is_active
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, Now(), Now(), ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, Now(), Now(), ?)
     """
 
     with get_cursor(commit=True) as cursor:
@@ -42,6 +44,7 @@ def create_user(role_id: int,
                 nit,
                 dui,
                 full_name,
+                gender,
                 phone_number,
                 is_active
             )
