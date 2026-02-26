@@ -8,6 +8,7 @@ create_user(
     email="test@2test.com",
     password_hash=hashed,
     nit=None,
+    gender="M",
     dui="00000000-0",
     full_name="Juan Pérez",
     phone_number="7777-7547"

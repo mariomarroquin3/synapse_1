@@ -1,57 +1,36 @@
 from config.database import get_cursor
 
-def create_user(role_id: int,
-                email: str,
-                password_hash: str,
-                nit: str | None,
-                dui: str,
-                full_name: str,
-                gender: str,
-                phone_number: str | None,
-                is_active: bool = True) -> None:
-    """
-    Inserta un nuevo usuario en la base de datos.
-    No realiza validaciones de negocio.
-    """
-
-    print("[DEBUG] Creando usuario en base de datos...")
-
+def create_user(role_id: int, email: str, password_hash: str, nit: str | None, 
+                dui: str, full_name: str, gender: str, phone_number: str | None, 
+                is_active: bool = True) -> int:
+    
     query = """
-        INSERT INTO user (
-            role_id,
-            email,
-            password_hash,
-            NIT,
-            DUI,
-            full_name,
-            gender,
-            phone_number,
-            created_at,
-            updated_at,
-            is_active
+        INSERT INTO [user] (
+            role_id, email, password_hash, NIT, DUI, 
+            full_name, gender, phone_number, created_at, updated_at, is_active
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, Now(), Now(), ?)
     """
 
+    # We use the 'with' block to ensure the cursor is active
     with get_cursor(commit=True) as cursor:
-        cursor.execute(
-            query,
-            (
-                role_id,
-                email,
-                password_hash,
-                nit,
-                dui,
-                full_name,
-                gender,
-                phone_number,
-                is_active
-            )
-        )
-
-    print("[DEBUG] Usuario creado correctamente.")
-
-
+        # Step 1: Execute the Insert
+        cursor.execute(query, (
+            role_id, email, password_hash, nit, dui, 
+            full_name, gender, phone_number, is_active
+        ))
+        
+        # Step 2: Get the ID immediately after
+        # Use a semicolon for some providers, or a separate execute
+        cursor.execute("SELECT @@IDENTITY")
+        row = cursor.fetchone()
+        
+        if row is None:
+            raise Exception("Database failed to return the new User ID.")
+            
+        new_id = int(row[0])
+        print(f"[DEBUG] User created successfully with ID: {new_id}")
+        return new_id
 def get_user_by_email(email: str):
     """
     Retorna un usuario por email.
@@ -105,7 +84,7 @@ def get_user_by_id(user_id: int):
 
     print("[DEBUG] Buscando usuario por ID...")
 
-    query = "SELECT * FROM user WHERE id = ?"
+    query = "SELECT * FROM [user] WHERE [Id_user] = ?"
 
     with get_cursor() as cursor:
         cursor.execute(query, (user_id,))

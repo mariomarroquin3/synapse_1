@@ -31,7 +31,7 @@ def test_deposit():
     print("\n===== TEST DEPOSIT =====")
 
     result = create_simple_transaction(
-        account_id=1,
+        account_id=11,
         amount=50.00,
         entry_type=ENTRY_CREDIT,
         description="Test deposit script",
@@ -46,7 +46,7 @@ def test_withdraw():
     print("\n===== TEST WITHDRAW =====")
 
     result = create_simple_transaction(
-        account_id=1,
+        account_id=11,
         amount=25.00,
         entry_type=ENTRY_DEBIT,
         description="Test withdraw script",
