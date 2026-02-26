@@ -34,7 +34,6 @@ def test_create_user_and_account():
         # Captura y muestra cualquier error
         print("❌ Error:", e)
 
-
 # Ejecuta la función solo si el archivo se corre directamente
 if __name__ == "__main__":
     test_create_user_and_account()

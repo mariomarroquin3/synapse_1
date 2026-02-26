@@ -66,3 +66,5 @@ htmlcov/
 # ==========================
 .streamlit/secrets.toml
 database/BancoDataBase.laccdb
+test_create_user.py
+test_create_user.py

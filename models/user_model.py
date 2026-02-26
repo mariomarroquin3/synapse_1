@@ -1,4 +1,7 @@
 from config.database import get_cursor
+from models.user_model import create_user, get_user_by_email, get_user_by_dui, get_user_by_phone
+from services.account_service import create_account_for_user  # <--- Agregar esta línea
+from utils.security import hash_password, verify_password
 
 def create_user(role_id: int, email: str, password_hash: str, nit: str | None, 
                 dui: str, full_name: str, gender: str, phone_number: str | None, 
