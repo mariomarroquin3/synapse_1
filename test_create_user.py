@@ -10,13 +10,13 @@ def test_create_user_and_account():
         # Llama al servicio para crear usuario (aplica reglas y encripta contraseña)
         user_id = create_user(
             role_id=2,
-            email="nuevo3@gmail.com",
-            password_hash=hash_password("12456"),
+            email="veroo3@gmail.com",
+            password_hash=hash_password("124435456"),
             nit=None,
             gender="M",
-            dui="11112121-3",
-            full_name="Usuario Prueba",
-            phone_number="7777-8858"
+            dui="11112121-0",
+            full_name="Verónica Martínez",
+            phone_number="7777-8850"
         )
 
         # Muestra el ID retornado

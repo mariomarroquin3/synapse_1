@@ -54,11 +54,11 @@ def _insert_transaction(cursor: Any, transaction_type_id: int, status_id: int,
     """
     sql = """
         INSERT INTO [transaction]
-            (transaction_type_id, status_id, description, created_by_user_id, transaction_date)
-        VALUES (?, ?, ?, ?, ?)
+            (transaction_type_id, status_id, description, created_by_user_id, transaction_date, processed_at)
+        VALUES (?, ?, ?, ?, ?, ?)
     """
     now = datetime.now()
-    cursor.execute(sql, (transaction_type_id, status_id, description, created_by_user_id, now))
+    cursor.execute(sql, (transaction_type_id, status_id, description, created_by_user_id, now, now))
     
     cursor.execute("SELECT @@IDENTITY")
     result = cursor.fetchone()
@@ -79,30 +79,7 @@ def create_transfer(from_account_id: int, to_account_id: int,
                     created_by_user_id: int,
                     transaction_type_id: int = 1,
                     status_id: int = 1) -> dict[str, Any]:
-    """
-    Crea una transferencia entre dos cuentas con total atomicidad.
-    
-    Atomicidad garantizada:
-      - Una única conexión para toda la operación
-      - Si algo falla, TODO se revierte (rollback)
-      - Si todo es exitoso, un único commit()
-    
-    Genera 2 entradas en ledger_entry:
-      1. Débito  → cuenta origen  (sale dinero)
-      2. Crédito → cuenta destino (entra dinero)
-
-    Args:
-        from_account_id     : ID de la cuenta que envía
-        to_account_id       : ID de la cuenta que recibe
-        amount              : Monto a transferir (positivo)
-        description         : Descripción de la operación
-        created_by_user_id  : Usuario que inicia la transferencia
-        transaction_type_id : FK a transaction_type (default 1 = transferencia)
-        status_id           : FK a transaction_status (default 1 = pendiente)
-
-    Returns:
-        dict con 'success', 'transaction_id', 'ledger_entries' o 'error'.
-    """
+  
     print(f"\n[TX_SERVICE] ── Iniciando transferencia (ATÓMICA) ───────────────")
     print(f"[TX_SERVICE] De cuenta={from_account_id} → A cuenta={to_account_id}, monto={amount}")
 

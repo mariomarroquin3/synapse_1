@@ -1,8 +1,6 @@
 """
 test_transactions.py
 
-Script manual para probar transaction_service
-sin necesidad de Streamlit ni login.
 """
 
 from services.transaction_service import (
@@ -16,12 +14,14 @@ def test_transfer():
     print("\n===== TEST TRANSFER =====")
 
     result = create_transfer(
-        from_account_id=11,      # Ajusta IDs reales
-        to_account_id=12,
+        from_account_id=1,      # Ajusta IDs reales
+        to_account_id=3,
+        transaction_type_id=1,
         amount=100.00,
         description="Test transfer script",
-        created_by_user_id=11    # Usuario existente en tu DB
+        created_by_user_id=19  # Usuario existente en tu DB
     )
+    # Debe evaluarse pertinencia de id_cuenta al usuario
 
     print("Resultado transferencia:")
     print(result)
@@ -31,11 +31,12 @@ def test_deposit():
     print("\n===== TEST DEPOSIT =====")
 
     result = create_simple_transaction(
-        account_id=11,
+        account_id=1,
         amount=50.00,
+        transaction_type_id=3,
         entry_type=ENTRY_CREDIT,
         description="Test deposit script",
-        created_by_user_id=1
+        created_by_user_id=19
     )
 
     print("Resultado depósito:")
@@ -46,11 +47,12 @@ def test_withdraw():
     print("\n===== TEST WITHDRAW =====")
 
     result = create_simple_transaction(
-        account_id=11,
+        account_id=1,
         amount=25.00,
+        transaction_type_id=2,
         entry_type=ENTRY_DEBIT,
         description="Test withdraw script",
-        created_by_user_id=1
+        created_by_user_id=19
     )
 
     print("Resultado retiro:")
