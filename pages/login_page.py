@@ -4,137 +4,118 @@ import os
 import re
 import time
 
-# --- FIX DE RUTAS ---
-# Asegura que el sistema encuentre los módulos en la carpeta raíz del proyecto
+# --- CONFIGURACIÓN DE RUTAS ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# --- IMPORTACIONES DE SERVICIOS Y MODELOS ---
+# --- IMPORTACIONES DE LÓGICA ---
 from models.user_model import (
     create_user, 
     get_user_by_email, 
-    get_user_by_dui, 
+    get_user_by_dui,
     get_user_by_phone
 )
-from services.account_service import create_account_for_user # Integrado desde lógica de test
+from services.account_service import create_account_for_user
 from utils.security import hash_password, verify_password
 
-st.set_page_config(page_title="Synapse 1.0 - Banking System", page_icon="🏦", layout="centered")
+# --- DISEÑO LIMPIO Y PROFESIONAL (AZUL Y BLANCO) ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600;700&display=swap');
+    html, body, [class*="st-"] { font-family: 'Segoe UI', sans-serif; }
+    .stApp { background-color: #fcfcfc; }
+    .hero-title { color: #0047AB; font-weight: 700; font-size: 3rem; text-align: center; margin-bottom: 0px; }
+    .hero-subtitle { color: #6c757d; text-align: center; font-size: 1.1rem; margin-bottom: 2.5rem; }
+    .custom-card { background-color: #ffffff; border: 1px solid #e9ecef; padding: 35px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 20px; }
+    .stButton>button { background-color: #0047AB !important; color: white !important; border-radius: 8px; font-weight: 600; width: 100%; transition: 0.3s; }
+    .stButton>button:hover { background-color: #003380 !important; }
+    .footer-text { text-align: center; color: #adb5bd; font-size: 0.8rem; margin-top: 4rem; padding-bottom: 2rem; }
+    </style>
+""", unsafe_allow_html=True)
 
-# --- FUNCIONES DE LIMPIEZA Y VALIDACIÓN (TIEMPO REAL) ---
+# --- FUNCIONES DE LIMPIEZA ---
 def clean_numeric_input(key):
-    """Elimina cualquier carácter no numérico en tiempo real."""
     value = st.session_state[key]
     clean_value = "".join(filter(str.isdigit, value))
     if value != clean_value:
         st.session_state[key] = clean_value
 
 def clean_name_input(key):
-    """Elimina números y símbolos del nombre en tiempo real."""
     value = st.session_state[key]
     clean_value = "".join(re.findall(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]', value))
     if value != clean_value:
         st.session_state[key] = clean_value
 
-st.title("Welcome to Synapse 1.0")
+# --- CABECERA ---
+st.markdown('<h1 class="hero-title">Synapse 1.0</h1>', unsafe_allow_html=True)
+st.markdown('<p class="hero-subtitle">Banca Digital de El Salvador</p>', unsafe_allow_html=True)
 
-# Pestañas principales
-tab1, tab2 = st.tabs(["Iniciar Sesión", "Registrarse"])
+tab_acceso, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Crear Cuenta"])
 
-# --- SECCIÓN DE LOGIN ---
-with tab1:
-    st.header("Login")
-    with st.form("login_form"):
-        login_email = st.text_input("Correo Electrónico")
-        login_password = st.text_input("Contraseña", type="password")
-        submit_login = st.form_submit_button("Entrar", use_container_width=True)
+# --- SECCIÓN: LOGIN ---
+with tab_acceso:
+    col_a, col_b, col_c = st.columns([0.15, 0.7, 0.15])
+    with col_b:
+        st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+        with st.form("form_login"):
+            st.markdown("#### Bienvenid@")
+            l_email = st.text_input("Correo electrónico", placeholder="usuario@correo.com")
+            l_pass = st.text_input("Contraseña", type="password", placeholder="••••••••")
+            submit_l = st.form_submit_button("INGRESAR")
 
-    if submit_login:
-        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        
-        if not re.match(email_regex, login_email):
-            st.error("❌ Por favor, ingresa un correo electrónico válido.")
-        else:
-            user = get_user_by_email(login_email)
-            
-            if not user:
-                st.error("❌ El correo electrónico no está registrado.")
-            else:
-                if verify_password(login_password, user.password_hash):
-                    st.success(f"¡Bienvenido de nuevo, {user.full_name}!")
-                    st.session_state["logged_in"] = True
+            if submit_l:
+                if not l_email or not l_pass:
+                    st.warning("Por favor, complete todos los campos.")
                 else:
-                    st.error("❌ Contraseña inválida.")
-                    
-# --- SECCIÓN DE REGISTRO ---
-with tab2:
-    st.header("Crear Cuenta")
-    col1, col2 = st.columns(2)
+                    user = get_user_by_email(l_email)
+                    # user[3] es el password_hash (columnas: Id_user, role_id, email, password_hash, ...)
+                    if user and verify_password(l_pass, user[3]):
+                        st.session_state["logged_in"] = True
+                        st.session_state["user_data"] = {
+                            "Id_user": user[0],
+                            "email": user[2],
+                            "full_name": user[6],
+                            "DUI": user[5],
+                            "phone_number": user[7]
+                        }
+                        st.toast(f"¡Bienvenido, {user[6]}!", icon='✅')
+                        time.sleep(1)
+                        st.switch_page("pages/home_page.py")
+                    else:
+                        st.error("Credenciales incorrectas.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# --- SECCIÓN: REGISTRO ---
+with tab_registro:
+    st.markdown('<div class="custom-card">', unsafe_allow_html=True)
+    st.markdown("#### Formulario de Registro")
+    r_col1, r_col2 = st.columns(2)
+    with r_col1:
+        reg_name = st.text_input("Nombre Completo", key="r_name", on_change=clean_name_input, args=("r_name",))
+        reg_email = st.text_input("Correo Electrónico", key="r_email_field")
+        raw_dui = st.text_input("Número de DUI", max_chars=9, key="r_dui", on_change=clean_numeric_input, args=("r_dui",))
+        dui_f = f"{raw_dui[:8]}-{raw_dui[8:]}" if len(raw_dui) == 9 else ""
+        if dui_f: st.caption(f"DUI: :blue[{dui_f}]")
+    with r_col2:
+        raw_tel = st.text_input("Teléfono", max_chars=8, key="r_phone", on_change=clean_numeric_input, args=("r_phone",))
+        tel_f = f"+503 {raw_tel[:4]}-{raw_tel[4:]}" if len(raw_tel) == 8 else ""
+        if tel_f: st.caption(f"Tel: :blue[{tel_f}]")
+        reg_pass = st.text_input("Contraseña", type="password", key="r_pass_field")
+        reg_conf = st.text_input("Confirmar Contraseña", type="password", key="r_conf_field")
     
-    with col1:
-        new_name = st.text_input("Nombre Completo", key="reg_name", on_change=clean_name_input, args=("reg_name",))
-        new_email = st.text_input("Correo Electrónico", key="reg_email")
-        
-        raw_dui = st.text_input("DUI (solo números)", max_chars=9, key="reg_dui", on_change=clean_numeric_input, args=("reg_dui",))
-        dui_ready = f"{raw_dui[:8]}-{raw_dui[8:]}" if len(raw_dui) == 9 else ""
-        if dui_ready: st.caption(f"✅ Formato: {dui_ready}")
-
-    with col2:
-        raw_phone = st.text_input("Teléfono (solo números)", max_chars=8, key="reg_phone", on_change=clean_numeric_input, args=("reg_phone",))
-        phone_ready = f"{raw_phone[:4]}-{raw_phone[4:]}" if len(raw_phone) == 8 else ""
-        if phone_ready: st.caption(f"✅ Formato: {phone_ready}")
-
-        new_pass = st.text_input("Contraseña", type="password", key="reg_pass")
-        confirm_pass = st.text_input("Confirmar Contraseña", type="password", key="reg_confirm")
-
-    selected_gender = st.selectbox("Género", ["Masculino", "Femenino"], key="reg_gender")
-    gender_letter = "M" if selected_gender == "Masculino" else "F"
-
-    if st.button("Registrar Usuario", use_container_width=True):
-        email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        
-        if not re.match(email_regex, new_email):
-            st.error("❌ Por favor, ingresa un correo electrónico válido.")
-        elif len(raw_dui) != 9 or len(raw_phone) != 8:
-            st.error("❌ El DUI o el Teléfono están incompletos.")
-        elif not new_name:
-            st.error("❌ El nombre completo es obligatorio.")
-        elif new_pass != confirm_pass:
-            st.warning("⚠️ Las contraseñas no coinciden.")
-        elif len(new_pass) < 6:
-            st.warning("⚠️ La contraseña debe tener al menos 6 caracteres.")
+    gen = st.selectbox("Género", ["Masculino", "Femenino", "Otro"], key="r_gender")
+    
+    if st.button("REGISTRAR CUENTA"):
+        if reg_pass != reg_conf: st.warning("Las contraseñas no coinciden.")
+        elif not reg_name or not reg_email: st.warning("Faltan datos obligatorios.")
         else:
             try:
-                # Validaciones de duplicados
-                if get_user_by_email(new_email):
-                    st.error(f"❌ El correo '{new_email}' ya está registrado.")
-                elif get_user_by_dui(dui_ready):
-                    st.error(f"❌ El DUI '{dui_ready}' ya está registrado.")
-                elif get_user_by_phone(phone_ready):
-                    st.error(f"❌ El número de teléfono '{phone_ready}' ya está registrado.")
+                if get_user_by_email(reg_email): st.error("Email ya registrado.")
                 else:
-                    # Lógica integrada del test_create_user
-                    hashed = hash_password(new_pass)
-                    
-                    # 1. Crear usuario y obtener ID
-                    new_user_id = create_user(
-                        role_id=2, 
-                        email=new_email, 
-                        password_hash=hashed,
-                        nit=None, 
-                        dui=dui_ready, 
-                        full_name=new_name,
-                        gender=gender_letter, 
-                        phone_number=phone_ready
-                    )
-                    
-                    # 2. Crear cuenta bancaria asociada
-                    create_account_for_user(new_user_id, "USD")
-
-                    st.success(f"✅ ¡Registro exitoso! Usuario creado con ID: {new_user_id} y cuenta USD activa.")
+                    h = hash_password(reg_pass)
+                    u_id = create_user(2, reg_email, h, None, dui_f, reg_name, gen[0], tel_f)
+                    create_account_for_user(u_id, "USD")
+                    st.success("✅ ¡Cuenta abierta con éxito!")
                     st.balloons()
-                    time.sleep(2)
-                    st.rerun()
-                    
-            except Exception as e:
-                st.error(f"❌ Error inesperado: {e}")
-                #nahum test
+            except Exception as e: st.error(f"Error: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('<div class="footer-text">© 2026 Synapse El Salvador.</div>', unsafe_allow_html=True)
