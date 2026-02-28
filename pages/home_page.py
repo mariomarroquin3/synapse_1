@@ -41,6 +41,11 @@ st.divider()
 # Menú de Navegación
 menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Retiros", "Depósitos", "Mi Perfil"])
 
+# --- BOTÓN DE CAJERO ---
+st.sidebar.divider()
+if st.sidebar.button("🏧 CAJERO", use_container_width=True):
+    st.switch_page("pages/atm_simulator.py")
+
 if menu == "Resumen":
     balance = 0.0 # Aquí deberás conectar tu servicio de saldo real
     col1, col2 = st.columns(2)
@@ -55,5 +60,3 @@ elif menu == "Mi Perfil":
     st.write(f"**Email:** {user['email']}")
     st.write(f"**Teléfono:** {user['phone_number']}")
     st.write(f"**DUI:** {user['DUI']}")
-
-# (Agrega aquí el resto de secciones de tu código original: Transferencias, etc.)
