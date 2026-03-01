@@ -29,6 +29,13 @@ def account_number_exists(account_number: str):
         return cursor.fetchone() is not None
 
 
+def get_account_by_number(account_number: str):
+    query = "SELECT * FROM [account] WHERE [account_number] = ?"
+    with get_cursor() as cursor:
+        cursor.execute(query, (account_number,))
+        return cursor.fetchone()
+
+
 def generate_account_number():
     while True:
         # Example: SV_synapse (Bank Code) + random digits

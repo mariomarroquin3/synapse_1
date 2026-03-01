@@ -1,7 +1,7 @@
 import streamlit as st
 import time
-from models.account_model import get_account_by_user
-from services.transaction_service import get_account_balance, get_account_history_by_type
+from models.account_model import get_account_by_user, get_account_by_number
+from services.transaction_service import get_account_balance, get_account_history_by_type, create_transfer
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
@@ -54,6 +54,51 @@ if menu == "Resumen":
         st.metric("Saldo Disponible", f"$ {balance:,.2f} {account['currency']}")
     with col2:
         st.metric("Puntos Synapse", "500 pts")
+
+elif menu == "Transferencias":
+    st.subheader("Transferencias a Terceros")
+    if not account["Id_account"]:
+        st.warning("No tienes una cuenta bancaria asociada para hacer transferencias.")
+    else:
+        balance = get_account_balance(account["Id_account"])
+        st.write(f"**Saldo disponible:** $ {balance:,.2f} {account['currency']}")
+        
+        with st.form("transfer_form"):
+            dest_account_num = st.text_input("Número de Cuenta Destino", placeholder="Ej. SV_synapse1234567")
+            amount_to_transfer = st.number_input("Monto a transferir", min_value=0.01, step=10.0, format="%.2f")
+            description = st.text_input("Concepto / Descripción", placeholder="Pago de servicios, almuerzo, etc.")
+            
+            submit_transfer = st.form_submit_button("Realizar Transferencia", type="primary", use_container_width=True)
+            
+            if submit_transfer:
+                if not dest_account_num or amount_to_transfer <= 0 or not description:
+                    st.warning("Por favor, completa todos los campos correctamente.")
+                elif dest_account_num == account["account_number"]:
+                    st.error("No puedes transferir dinero a tu propia cuenta.")
+                elif amount_to_transfer > balance:
+                    st.error("Fondos insuficientes para realizar esta transferencia.")
+                else:
+                    dest_account = get_account_by_number(dest_account_num)
+                    if not dest_account:
+                        st.error("La cuenta destino no existe o es inválida.")
+                    else:
+                        with st.spinner("Procesando transferencia..."):
+                            time.sleep(1.5) # Simular procesamiento
+                            dest_account_id = dest_account[0] # Id_account es el index 0
+                            result = create_transfer(
+                                from_account_id=account["Id_account"],
+                                to_account_id=dest_account_id,
+                                amount=amount_to_transfer,
+                                description=description,
+                                created_by_user_id=user["Id_user"],
+                                transaction_type_id=1 # 1 = Transferencia entre cuentas
+                            )
+                            
+                            if result.get("success"):
+                                st.success(f"¡Transferencia de ${amount_to_transfer:,.2f} realizada exitosamente a {dest_account_num}!")
+                                st.balloons()
+                            else:
+                                st.error(f"Error al procesar la transferencia: {result.get('error')}")
 
 elif menu == "Retiros":
     st.subheader("Historial de Retiros")
