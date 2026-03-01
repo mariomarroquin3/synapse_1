@@ -289,9 +289,9 @@ def get_account_history_by_type(account_id: int, transaction_type_id: int) -> li
     from config.database import get_connection
     
     sql = '''
-        SELECT t.transaction_date, t.description, l.amount
-        FROM ledger_entry l
-        INNER JOIN [transaction] t ON l.transaction_id = t.Id_transaction
+        SELECT t.transaction_date, t.description, l.amount, l.entry_type
+        FROM (ledger_entry l
+        INNER JOIN [transaction] t ON l.transaction_id = t.Id_transaction)
         WHERE l.account_id = ? AND t.transaction_type_id = ?
         ORDER BY t.transaction_date DESC
     '''
@@ -308,7 +308,8 @@ def get_account_history_by_type(account_id: int, transaction_type_id: int) -> li
             history.append({
                 "date": row[0],
                 "description": row[1],
-                "amount": float(row[2])
+                "amount": float(row[2]),
+                "entry_type": row[3]
             })
             
         return history

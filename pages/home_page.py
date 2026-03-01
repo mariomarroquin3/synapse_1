@@ -40,7 +40,7 @@ with head_col2:
 st.divider()
 
 # Menú de Navegación
-menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Retiros", "Depósitos", "Mi Perfil"])
+menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Historial Transferencias", "Retiros", "Depósitos", "Mi Perfil"])
 
 # --- BOTÓN DE CAJERO ---
 st.sidebar.divider()
@@ -99,6 +99,25 @@ elif menu == "Transferencias":
                                 st.balloons()
                             else:
                                 st.error(f"Error al procesar la transferencia: {result.get('error')}")
+
+elif menu == "Historial Transferencias":
+    st.subheader("Historial de Transferencias")
+    if not account["Id_account"]:
+        st.warning("No tienes una cuenta bancaria asociada para ver el historial.")
+    else:
+        tx_history = get_account_history_by_type(account["Id_account"], 1) # 1 = Transferencia entre cuentas
+        if tx_history:
+            for tx in tx_history:
+                with st.container(border=True):
+                    st.markdown(f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}")
+                    st.markdown(f"**Descripción:** {tx['description']}")
+                    
+                    if tx['entry_type'] == 'debit':
+                        st.markdown(f"**Monto:** <span style='color:red;'>-$ {tx['amount']:,.2f}</span> (Enviado)", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"**Monto:** <span style='color:green;'>+$ {tx['amount']:,.2f}</span> (Recibido)", unsafe_allow_html=True)
+        else:
+            st.info("No tienes transferencias registradas todavía.")
 
 elif menu == "Retiros":
     st.subheader("Historial de Retiros")
