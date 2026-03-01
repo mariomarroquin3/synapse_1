@@ -247,3 +247,41 @@ def create_simple_transaction(account_id: int, amount: float,
         if conn:
             conn.close()
         print(f"[TX_SERVICE] ── Fin de tx simple ──────────────────────────────\n")
+
+def get_account_balance(account_id: int) -> float:
+    from config.database import get_connection
+    from models.ledger_model import DEBIT, CREDIT
+    
+    sql = '''
+        SELECT entry_type, SUM(amount)
+        FROM ledger_entry
+        WHERE account_id = ?
+        GROUP BY entry_type
+    '''
+    balance = 0.0
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(sql, (account_id,))
+        rows = cursor.fetchall()
+        
+        for row in rows:
+            entry_type = row[0]
+            amount = float(row[1] or 0.0)
+            if entry_type == CREDIT:
+                balance += amount
+            elif entry_type == DEBIT:
+                balance -= amount
+                
+        return balance
+    except Exception as e:
+        print(f'[TX_SERVICE] ? Error calculando balance: {e}')
+        return 0.0
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+

@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 from models.account_model import get_account_by_user
+from services.transaction_service import get_account_balance
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
@@ -9,7 +10,7 @@ st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.error("No has iniciado sesión.")
     if st.button("Ir al Login"):
-        st.switch_page("login_page.py")
+        st.switch_page("pages/login_page.py")
     st.stop()
 
 # --- CARGA DE DATOS ---
@@ -25,7 +26,7 @@ account = {
 def logout():
     st.session_state.logged_in = False
     st.session_state.user_data = None
-    st.switch_page("login_page.py")
+    st.switch_page("pages/login_page.py")
 
 # --- VISTA DE BANCA EN LÍNEA ---
 head_col1, head_col2 = st.columns([3, 1])
@@ -47,7 +48,7 @@ if st.sidebar.button("🏧 CAJERO", use_container_width=True):
     st.switch_page("pages/atm_simulator.py")
 
 if menu == "Resumen":
-    balance = 0.0 # Aquí deberás conectar tu servicio de saldo real
+    balance = get_account_balance(account["Id_account"]) if account["Id_account"] else 0.0
     col1, col2 = st.columns(2)
     with col1:
         st.metric("Saldo Disponible", f"$ {balance:,.2f} {account['currency']}")
