@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 from models.account_model import get_account_by_user
-from services.transaction_service import get_account_balance
+from services.transaction_service import get_account_balance, get_account_history_by_type
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
@@ -54,6 +54,36 @@ if menu == "Resumen":
         st.metric("Saldo Disponible", f"$ {balance:,.2f} {account['currency']}")
     with col2:
         st.metric("Puntos Synapse", "500 pts")
+
+elif menu == "Retiros":
+    st.subheader("Historial de Retiros")
+    if account["Id_account"]:
+        history = get_account_history_by_type(account["Id_account"], 2) # 2 = retiro cajero automático
+        if history:
+            for tx in history:
+                with st.container(border=True):
+                    st.markdown(f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}")
+                    st.markdown(f"**Descripción:** {tx['description']}")
+                    st.markdown(f"**Monto:** <span style='color:red;'>-$ {tx['amount']:,.2f}</span>", unsafe_allow_html=True)
+        else:
+            st.info("No tienes retiros registrados todavía.")
+    else:
+        st.warning("No tienes una cuenta bancaria asociada.")
+
+elif menu == "Depósitos":
+    st.subheader("Historial de Depósitos")
+    if account["Id_account"]:
+        history = get_account_history_by_type(account["Id_account"], 3) # 3 = depósito cajero automático
+        if history:
+            for tx in history:
+                with st.container(border=True):
+                    st.markdown(f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}")
+                    st.markdown(f"**Descripción:** {tx['description']}")
+                    st.markdown(f"**Monto:** <span style='color:green;'>+$ {tx['amount']:,.2f}</span>", unsafe_allow_html=True)
+        else:
+            st.info("No tienes depósitos registrados todavía.")
+    else:
+        st.warning("No tienes una cuenta bancaria asociada.")
 
 elif menu == "Mi Perfil":
     st.subheader("Información Personal")
