@@ -76,7 +76,7 @@ if st.button("💰 Depositar Dinero", type="primary", use_container_width=True):
                 entry_type=ENTRY_CREDIT,
                 description=f"Depósito cajero automático ({account['currency']})",
                 created_by_user_id=user["Id_user"],
-                transaction_type_id=2, # 2 = depósito/retiro
+                transaction_type_id=3, # 3 = depósito cajero automático
                 status_id=1            # Se asume 1=Completada según los servicios
             )
             

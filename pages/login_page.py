@@ -191,12 +191,12 @@ with tab_reg:
             r_name_raw = st.text_input("Nombre", placeholder="Tu nombre completo")
             r_email = st.text_input("Email", placeholder="tu@correo.com")
             r_dui_raw = st.text_input("DUI", max_chars=9, placeholder="000000000")
+            r_nit_raw = st.text_input("NIT para empresas(Opcional)", max_chars=10, placeholder="00000000-0")
         with r_col2:
             r_tel_raw = st.text_input("Teléfono", max_chars=8, placeholder="70000000")
             r_pass = st.text_input("Clave", type="password", placeholder="Clave segura")
             r_conf = st.text_input("Confirmar", type="password", placeholder="Repite tu clave")
-        
-        r_gen = st.selectbox("Género", ["Masculino", "Femenino", "Otro"])
+            r_gen = st.selectbox("Género", ["Masculino", "Femenino", "Otro"])
         
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         btn_reg = st.form_submit_button("REGISTRARME AHORA")
@@ -206,6 +206,7 @@ with tab_reg:
             clean_name = get_clean_name(r_name_raw)
             clean_dui = get_clean_numeric(r_dui_raw)
             clean_tel = get_clean_numeric(r_tel_raw)
+            clean_nit = get_clean_numeric(r_nit_raw) if r_nit_raw else None
             
             if r_pass != r_conf: 
                 st.error("Las contraseñas no coinciden.")
@@ -219,9 +220,10 @@ with tab_reg:
                         # Aplicar formato a DUI y Teléfono
                         dui_f = f"{clean_dui[:8]}-{clean_dui[8:]}" if len(clean_dui) == 9 else clean_dui
                         tel_f = f"+503 {clean_tel[:4]}-{clean_tel[4:]}" if len(clean_tel) == 8 else clean_tel
+                        nit_f = f"{clean_nit[:8]}-{clean_nit[8:]}" if clean_nit and len(clean_nit) == 9 else (r_nit_raw if r_nit_raw else None)
                         
                         h = hash_password(r_pass)
-                        u_id = create_user(2, r_email, h, None, dui_f, clean_name, r_gen[0], tel_f)
+                        u_id = create_user(2, r_email, h, nit_f, dui_f, clean_name, r_gen[0], tel_f)
                         create_account_for_user(u_id, "USD")
                         st.success("¡Bienvenido a Synapse!")
                         st.balloons()
