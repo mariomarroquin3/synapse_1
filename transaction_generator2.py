@@ -13,14 +13,18 @@ from services.card_service import create_card_for_account
 from services.bill_payment_service import pay_bill_with_card
 
 # --- 1. HELPERS DE BASE DE DATOS ---
-def get_all_account_ids() -> List[int]:
-    query = "SELECT [Id_account] FROM [account]"
+def get_all_account_ids():
+    # Eliminamos la restricción de status_id = 1 temporalmente 
+    # por si tus cuentas se crearon con un estado diferente o nulo.
+    query = "SELECT Id_account FROM [account]" 
+    
     with get_cursor() as cursor:
         cursor.execute(query)
-        return [int(row[0]) for row in cursor.fetchall()]
+        rows = cursor.fetchall()
+        return [row[0] for row in rows]
 
 def get_user_id_by_account(account_id: int) -> int:
-    query = "SELECT [user_id] FROM [account] WHERE [id] = ?"
+    query = "SELECT [user_id] FROM [account] WHERE [Id_account] = ?"
     with get_cursor() as cursor:
         cursor.execute(query, (account_id,))
         row = cursor.fetchone()
@@ -30,6 +34,7 @@ def get_user_id_by_account(account_id: int) -> int:
             raise Exception(f"La cuenta {account_id} no tiene usuario.")
 
 def get_card_tokens_for_account(account_id: int) -> List[str]:
+   
     query = "SELECT [card_token] FROM [card] WHERE [account_id] = ?"
     with get_cursor() as cursor:
         cursor.execute(query, (account_id,))
@@ -72,22 +77,24 @@ def seed_cards_for_accounts(account_ids: List[int]) -> None: # <-- Tipos añadid
     print("✅ Fase de tarjetas completada.")
 
 # --- 4. FASE 2: SIMULACIÓN DE TRANSACCIONES Y PAGOS ---
-def run_multi_type_simulation(iterations: int = 15) -> None: # <-- Tipos añadidos
-    print(f"\n🚀 FASE 2: Iniciando {iterations} operaciones...")
+def run_multi_type_simulation(iterations: int = 20) -> None:
+    print(f"\n🚀 INICIANDO SIMULACIÓN: {iterations} operaciones directas...")
     
+
     account_ids = get_all_account_ids()
     if len(account_ids) < 2:
         print("❌ Error: Necesitas al menos 2 cuentas para simular.")
         return
         
-    seed_cards_for_accounts(account_ids)
+    print(f"✅ Cuentas detectadas: {len(account_ids)}")
+
 
     for i in range(iterations):
-        # Explicitamente declaramos que res es un diccionario
         res: Dict[str, Any] = {"success": False, "error": "No ejecutado"}
         
-        tx_type = random.choices([1, 2, 3, 4], weights=[20, 10, 45, 25], k=1)[0]
-        amount = round(random.uniform(10.0, 150.0), 2)
+        # Tipos: 1=Transfer, 2=Retiro, 3=Depósito, 4=Pago
+        tx_type = random.choices([1, 2, 3, 4], weights=[25, 15, 40, 20], k=1)[0]
+        amount = round(random.uniform(5.0, 200.0), 2)
         acc_id = random.choice(account_ids)
         
         try:
@@ -107,25 +114,25 @@ def run_multi_type_simulation(iterations: int = 15) -> None: # <-- Tipos añadid
                 res = create_simple_transaction(acc_id, amount, ENTRY_CREDIT, "Sim. Depósito", owner_user_id)
                 
             elif tx_type == 4:
+                # Solo intentamos pago si hay tarjetas
                 tokens = get_card_tokens_for_account(acc_id)
                 if not tokens:
-                    print(f"🛒 [{i+1}] PAYMENT: Saltado. Cuenta {acc_id} no tiene tarjetas.")
+                    print(f"🛒 [{i+1}] PAYMENT: Saltado (Sin tarjetas en cuenta {acc_id})")
                     continue
                     
                 token = random.choice(tokens)
-                bill_name = random.choice(["Netflix", "Spotify", "Luz Eléctrica", "Amazon AWS", "Agua"])
+                bill_name = random.choice(["Netflix", "Spotify", "Luz", "Internet"])
                 print(f"🛒 [{i+1}] PAYMENT: {acc_id} pagando {bill_name} | ${amount}")
-                
                 res = pay_bill_with_card(token, amount, bill_name, owner_user_id)
 
-            # Ya no verificamos 'if res is not None' porque garantizamos que es un Dict
+            # Verificación de éxito
             if res.get("success"):
-                print(f"   ✅ Éxito")
+                print(f"   ✅ OK")
             else:
-                print(f"   ⚠️ Rechazado: {res.get('error', 'Nulo')}")
+                print(f"   ⚠️ Falló: {res.get('error')}")
 
         except Exception as e:
-            print(f"   ❌ Error crítico: {e}")
+            print(f"   ❌ Error en iteración {i+1}: {e}")
 
     print("\n--- Simulación Finalizada ---")
 
