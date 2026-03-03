@@ -121,3 +121,41 @@ def update_last_login(user_id: int) -> None:
         cursor.execute(query, (user_id,))
 
     print("[DEBUG] Último login actualizado.")
+
+
+def get_users_by_role_category(is_staff: bool):
+    """
+    Retorna una lista de usuarios (como diccionarios).
+    Si is_staff es True, retorna roles 1, 3, 4, 5.
+    Si is_staff es False, retorna rol 2 (Clientes).
+    """
+    if is_staff:
+        query = "SELECT * FROM [user] WHERE role_id IN (1, 3, 4, 5)"
+    else:
+        query = "SELECT * FROM [user] WHERE role_id = 2"
+
+    with get_cursor() as cursor:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        columns = [col[0] for col in cursor.description]
+        return [dict(zip(columns, row)) for row in rows]
+
+
+def update_user_status(user_id: int, is_active: bool) -> bool:
+    """
+    Activa o suspende una cuenta de usuario.
+    """
+    query = "UPDATE [user] SET is_active = ?, updated_at = Now() WHERE Id_user = ?"
+    with get_cursor(commit=True) as cursor:
+        cursor.execute(query, (is_active, user_id))
+        return cursor.rowcount > 0
+
+
+def update_user_role(user_id: int, role_id: int) -> bool:
+    """
+    Actualiza el rol de un usuario.
+    """
+    query = "UPDATE [user] SET role_id = ?, updated_at = Now() WHERE Id_user = ?"
+    with get_cursor(commit=True) as cursor:
+        cursor.execute(query, (role_id, user_id))
+        return cursor.rowcount > 0

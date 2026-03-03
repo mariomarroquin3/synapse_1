@@ -46,6 +46,10 @@ def register_user_with_permissions(creator_id, user_data):
         # Validate creator is Admin
         if creator['role_id'] != ROLE_ADMIN:
             return {"success": False, "error": f"Permission Denied: Only Admins can create staff. User '{creator['full_name']}' has role {creator['role_id']}."}
+    
+    # RULE: Admin cannot create Clients via this service
+    if target_role == ROLE_CLIENTE and creator_id:
+        return {"success": False, "error": "Administrators are not allowed to create client accounts. Client registration is public only."}
 
     # If rules pass, proceed to creation
     try:
