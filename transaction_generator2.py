@@ -107,11 +107,11 @@ def run_multi_type_simulation(iterations: int = 20) -> None:
 
             elif tx_type == 2:
                 print(f"💸 [{i+1}] WITHDRAWAL: {acc_id} | ${amount}")
-                res = create_simple_transaction(acc_id, amount, ENTRY_DEBIT, "Sim. Retiro", owner_user_id)
+                res = create_simple_transaction(acc_id, amount, ENTRY_DEBIT, "Sim. Retiro", owner_user_id, transaction_type_id=2)
 
             elif tx_type == 3:
                 print(f"💰 [{i+1}] DEPOSIT: {acc_id} | ${amount}")
-                res = create_simple_transaction(acc_id, amount, ENTRY_CREDIT, "Sim. Depósito", owner_user_id)
+                res = create_simple_transaction(acc_id, amount, ENTRY_CREDIT, "Sim. Depósito", owner_user_id, transaction_type_id=3)
                 
             elif tx_type == 4:
                 # Solo intentamos pago si hay tarjetas

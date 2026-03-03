@@ -164,7 +164,7 @@ def create_transfer(from_account_id: int, to_account_id: int,
 def create_simple_transaction(account_id: int, amount: float,
                                entry_type: str, description: str,
                                created_by_user_id: int,
-                               transaction_type_id: int = 2,
+                               transaction_type_id: int, 
                                status_id: int = 1) -> dict[str, Any]:
     """
     Crea una transacción simple con UNA sola entrada en ledger_entry.
