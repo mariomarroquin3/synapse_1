@@ -54,3 +54,29 @@ def get_cards_by_account(account_id: int):
         cursor.execute(query, (account_id,))
         # fetchall() devuelve una lista de tuplas
         return cursor.fetchall()
+    # Tarjetas 8-2
+def get_card_with_user(account_id: int):
+    """
+    Obtiene la tarjeta junto con el nombre real del usuario
+    compatible con Microsoft Access.
+    """
+
+    query = """
+        SELECT 
+            c.Id_card,
+            c.card_number_last4,
+            c.expiration_date,
+            u.full_name
+        FROM 
+            ([card] AS c 
+            INNER JOIN [account] AS a 
+                ON c.account_id = a.id_account)
+        INNER JOIN [user] AS u 
+            ON a.user_id = u.id_user
+        WHERE 
+            c.account_id = ?
+    """
+
+    with get_cursor() as cursor:
+        cursor.execute(query, (account_id,))
+        return cursor.fetchone()
