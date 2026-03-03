@@ -17,17 +17,30 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
 user = st.session_state.user_data
 account_row = get_account_by_user(user["Id_user"])
 
+# Si no hay datos, detenemos la ejecución con un mensaje claro
 if not account_row:
-    st.error("No se encontró una cuenta bancaria asociada a tu usuario.")
+    st.error("⚠️ No se encontró una cuenta bancaria activa asociada a tu usuario.")
     if st.button("Volver al Inicio"):
         st.switch_page("pages/home_page.py")
     st.stop()
 
-account = {
-    "Id_account": account_row[0],
-    "account_number": account_row[2],
-    "currency": account_row[3]
-}
+# Mapeo universal (Soporta Tuplas/Listas y Diccionarios)
+account = {}
+
+try:
+    if isinstance(account_row, (list, tuple)):
+        # Acceso por índice (Legacy/Tuple)
+        account["Id_account"]     = account_row[0]
+        account["account_number"] = account_row[2]
+        account["currency"]       = account_row[3]
+    elif isinstance(account_row, dict):
+        # Acceso por nombre (Modern/Dict)
+        account["Id_account"]     = account_row.get("Id_account")
+        account["account_number"] = account_row.get("account_number")
+        account["currency"]       = account_row.get("currency")
+except Exception as e:
+    st.error(f"Error técnico al procesar la cuenta: {e}")
+    st.stop()
 
 # --- VISTA DE CAJERO AUTOMÁTICO ---
 st.title("🏧 Cajero Automático")
