@@ -21,6 +21,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def login(email: str, password: str):
     """
     Autentica usuario por email.
+    Retorna tupla (success: bool, result: dict | str)
     """
 
     print(f"[DEBUG] Intentando login para: {email}")
@@ -31,14 +32,10 @@ def login(email: str, password: str):
         print("[DEBUG] Usuario no encontrado.")
         return False, "Usuario no encontrado"
 
-    # ⚠️ IMPORTANTE
-    # user es una tupla porque fetchone() devuelve tuple en pyodbc
-    # Debemos acceder por índice
-
-    # Ajusta estos índices según el orden real de tu tabla
-    user_id = user[0]
-    password_hash = user[3]   # ajusta si el orden cambia
-    is_active = user[9]       # ajusta si el orden cambia
+    # user ahora es un diccionario gracias al Dictionary Wrapper
+    user_id = user['Id_user']
+    password_hash = user['password_hash']
+    is_active = user['is_active']
 
     if not is_active:
         print("[DEBUG] Usuario inactivo.")

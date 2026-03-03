@@ -36,7 +36,7 @@ def create_user(role_id: int, email: str, password_hash: str, nit: str | None,
 
 def get_user_by_email(email: str):
     """
-    Retorna un usuario por email.
+    Retorna un usuario por email como un diccionario.
     Devuelve None si no existe.
     """
     print("[DEBUG] Buscando usuario por email...")
@@ -48,43 +48,63 @@ def get_user_by_email(email: str):
 
         if row:
             print("[DEBUG] Usuario encontrado.")
+            # Convert tuple to dictionary using column names
+            user_dict = dict(zip([col[0] for col in cursor.description], row))
+            return user_dict
         else:
             print("[DEBUG] Usuario no encontrado.")
-
-        return row
+            return None
 
 def get_user_by_dui(dui: str):
     """
-    Retorna un usuario por DUI.
+    Retorna un usuario por DUI como un diccionario.
     Útil para validar duplicados antes de insertar.
+    Devuelve None si no existe.
     """
     print(f"[DEBUG] Buscando usuario por DUI: {dui}")
     query = "SELECT * FROM [user] WHERE DUI = ?"
     with get_cursor() as cursor:
         cursor.execute(query, (dui,))
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        if row:
+            return dict(zip([col[0] for col in cursor.description], row))
+        return None
 
 def get_user_by_phone(phone_number: str):
     """
-    Retorna un usuario por número de teléfono.
+    Retorna un usuario por número de teléfono como un diccionario.
     Útil para validar duplicados antes de insertar.
+    Devuelve None si no existe.
     """
     print(f"[DEBUG] Buscando usuario por teléfono: {phone_number}")
     query = "SELECT * FROM [user] WHERE phone_number = ?"
     with get_cursor() as cursor:
         cursor.execute(query, (phone_number,))
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        if row:
+            return dict(zip([col[0] for col in cursor.description], row))
+        return None
 
 def get_user_by_id(user_id: int):
     """
-    Retorna un usuario por ID.
+    Retorna un usuario por ID como un diccionario.
+    Devuelve None si no existe.
     """
     print("[DEBUG] Buscando usuario por ID...")
     query = "SELECT * FROM [user] WHERE [Id_user] = ?"
 
     with get_cursor() as cursor:
         cursor.execute(query, (user_id,))
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        
+        if row:
+            # Convert tuple to dictionary using column names
+            user_dict = dict(zip([col[0] for col in cursor.description], row))
+            print(f"[DEBUG] Usuario encontrado: {user_dict['full_name']}")
+            return user_dict
+        else:
+            print("[DEBUG] Usuario no encontrado.")
+            return None
 
 def update_last_login(user_id: int) -> None:
     """
