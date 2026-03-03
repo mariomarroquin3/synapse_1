@@ -171,12 +171,20 @@ with tab_login:
                 st.warning("Por favor completa tus datos.")
             else:
                 user = get_user_by_email(l_email)
-                if user and verify_password(l_pass, user[3]):
+                # Validación exitosa usando Dictionary Keys
+                if user and verify_password(l_pass, user['password_hash']):
                     st.session_state["logged_in"] = True
+                    
+                    # 🚀 AQUI ESTÁ LA SOLUCIÓN: Usar las llaves en lugar de índices numéricos
                     st.session_state["user_data"] = {
-                        "Id_user": user[0], "email": user[2], "full_name": user[6],
-                        "DUI": user[5], "phone_number": user[7]
+                        "Id_user": user['Id_user'], 
+                        "email": user['email'], 
+                        "full_name": user['full_name'],
+                        "DUI": user['dui'], 
+                        "phone_number": user['phone_number'],
+                        "role_id": user['role_id']  # Agregado para Control de Roles
                     }
+                    
                     st.success("Acceso concedido.")
                     time.sleep(0.5)
                     st.switch_page("pages/home_page.py")
