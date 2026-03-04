@@ -172,7 +172,28 @@ def create_simple_transaction(account_id: int, amount: float,
                                entry_type: str, description: str,
                                created_by_user_id: int,
                                transaction_type_id: int, 
-                               status_id: int = 1) -> dict[str, Any]:
+                               status_id: int = 1,
+                               card_number: str | None = None,
+                               card_token: str | None = None) -> dict[str, Any]:
+    """
+    Crea una transacción simple (depósito, retiro, etc).
+    
+    Si card_number se proporciona, valida la tarjeta antes de procesar.
+    
+    Args:
+        account_id: Cuenta a afectar
+        amount: Monto de la transacción
+        entry_type: DEBIT o CREDIT
+        description: Descripción del movimiento
+        created_by_user_id: Usuario que crea la transacción
+        transaction_type_id: Tipo de transacción (2=Retiro, 3=Depósito, 4=Pago)
+        status_id: Estado de la transacción (default=1=Pending)
+        card_number: Número de tarjeta (opcional, para transacciones con tarjeta)
+        card_token: Token de tarjeta (requerido si card_number se proporciona)
+        
+    Returns:
+        dict: {'success': bool, 'transaction_id': int | None, 'ledger_entry_id': int | None}
+    """
     
     if amount <= 0:
         return {"success": False, "error": "El monto debe ser mayor a cero."}
@@ -194,6 +215,32 @@ def create_simple_transaction(account_id: int, amount: float,
     try:
         conn = get_connection()
         cursor = conn.cursor()
+        
+        # VALIDACIÓN OPCIONAL: Si se proporciona card_number, validar tarjeta
+        if card_number is not None:
+            print(f"[TX_SERVICE] Validando tarjeta para transacción...")
+            if card_token is None:
+                return {"success": False, "error": "card_token es requerido cuando se proporciona card_number"}
+            
+            # Importar aquí para evitar dependencias circulares
+            from services.card_service import validate_card_for_transaction
+            
+            card_validation = validate_card_for_transaction(cursor, card_number, card_token)
+            if not card_validation["success"]:
+                return {
+                    "success": False, 
+                    "error": card_validation["error"]
+                }
+            
+            # Verificar que la tarjeta pertenece a la cuenta correcta
+            card_account_id = card_validation["account_id"]
+            if card_account_id != account_id:
+                return {
+                    "success": False,
+                    "error": f"La tarjeta no pertenece a esta cuenta (Tarjeta: {card_account_id}, Cuenta: {account_id})"
+                }
+            
+            print(f"[TX_SERVICE] ✅ Tarjeta validada correctamente")
 
         tx_id = _insert_transaction(cursor, transaction_type_id, status_id, description, created_by_user_id)
         ledger_id = create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=entry_type)
