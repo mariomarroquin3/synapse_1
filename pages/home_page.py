@@ -202,7 +202,7 @@ elif menu == "Mis Tarjetas":
                     with st.container(border=True):
                         # Estética de tarjeta "Premium"
                         type_label = "DÉBITO" if type_id == 1 else "VIRTUAL"
-                        st.caption(f"TARJETA DE {type_label}")
+                        st.caption(f"TARJETA  {type_label}")
                         st.markdown(f"#### **** **** **** {last4}")
                         
                         subcol1, subcol2 = st.columns(2)
