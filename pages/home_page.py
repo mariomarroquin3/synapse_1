@@ -1,7 +1,11 @@
 import streamlit as st
 import time
 from models.account_model import get_account_by_user, get_account_by_number
+from models.card_model import get_cards_by_account
 from services.transaction_service import get_account_balance, get_account_history_by_type, create_transfer
+from services.card_service import update_card_active_status, create_card_for_account
+from utils.card_generator import generate_luhn_card_number
+from config.database import get_connection
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
@@ -57,7 +61,7 @@ with head_col2:
 st.divider()
 
 # Menú de Navegación
-menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Historial Transferencias", "Retiros", "Depósitos", "Mi Perfil"])
+menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Mis Tarjetas", "Historial Transferencias", "Retiros", "Depósitos", "Mi Perfil"])
 
 # --- BOTÓN DE CAJERO ---
 st.sidebar.divider()
@@ -177,6 +181,80 @@ elif menu == "Depósitos":
             st.info("No tienes depósitos registrados todavía.")
     else:
         st.warning("No tienes una cuenta bancaria asociada.")
+
+elif menu == "Mis Tarjetas":
+    st.subheader("Gestión de Tarjetas")
+    if not account["Id_account"]:
+        st.warning("No tienes una cuenta bancaria asociada.")
+    else:
+        # 1. VISUALIZACIÓN DE TARJETAS
+        st.markdown("### Mis Tarjetas Activas")
+        cards = get_cards_by_account(account["Id_account"])
+        
+        if cards:
+            cols = st.columns(2)
+            for idx, card in enumerate(cards):
+                # card = (Id_card, account_id, card_type_id, last4, token, holder_name, exp_date, created_at)
+                card_id, _, type_id, last4, token, holder, exp_date, _ = card
+                is_active = True # Default since column is missing
+                
+                with cols[idx % 2]:
+                    with st.container(border=True):
+                        # Estética de tarjeta "Premium"
+                        type_label = "DÉBITO" if type_id == 1 else "VIRTUAL"
+                        st.caption(f"TARJETA DE {type_label}")
+                        st.markdown(f"#### **** **** **** {last4}")
+                        
+                        subcol1, subcol2 = st.columns(2)
+                        with subcol1:
+                            st.write(f"**Titular:**\n{holder}")
+                        with subcol2:
+                            exp_str = exp_date.strftime("%m/%y") if exp_date else "--/--"
+                            st.write(f"**Vence:**\n{exp_str}")
+                        
+                        st.markdown(f"Estado: <span style='color:green; font-weight:bold;'>ACTIVA</span>", unsafe_allow_html=True)
+                        
+                        st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
+        else:
+            st.info("No tienes tarjetas vinculadas a esta cuenta.")
+
+        st.divider()
+
+        # 2. SOLICITUD DE NUEVA TARJETA
+        st.markdown("### Solicitar Nueva Tarjeta")
+        if len(cards) >= 2:
+            st.warning("Has alcanzado el límite máximo de 2 tarjetas por cuenta.")
+        else:
+            with st.expander("Abrir formulario de solicitud"):
+                with st.form("new_card_form"):
+                    type_options = {1: "Débito Física", 2: "Virtual"}
+                    selected_type_name = st.selectbox("Tipo de Tarjeta", options=list(type_options.values()))
+                    selected_type_id = [k for k, v in type_options.items() if v == selected_type_name][0]
+                    
+                    holder_name = st.text_input("Nombre en la Tarjeta", value=user["full_name"])
+                    
+                    submit_card = st.form_submit_button("Emitir Tarjeta Ahora", type="primary")
+                    
+                    if submit_card:
+                        if not holder_name:
+                            st.error("El nombre del titular es requerido.")
+                        else:
+                            with st.spinner("Generando nueva tarjeta..."):
+                                full_number = generate_luhn_card_number()
+                                result = create_card_for_account(
+                                    account_id=account["Id_account"],
+                                    card_type_id=selected_type_id,
+                                    holder_name=holder_name,
+                                    full_card_number=full_number
+                                )
+                                
+                                if result.get("success"):
+                                    st.success(f"¡Tarjeta emitida con éxito! Terminación: {result['last4']}")
+                                    st.balloons()
+                                    time.sleep(2)
+                                    st.rerun()
+                                else:
+                                    st.error(f"Error: {result.get('error')}")
 
 elif menu == "Mi Perfil":
     st.subheader("Información Personal")
