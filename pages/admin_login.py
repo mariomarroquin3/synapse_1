@@ -18,37 +18,50 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
     
-    .stApp { background-color: #0F172A; }
+    :root {
+        --primary: #3B82F6;
+        --secondary: #60A5FA;
+        --bg-main: #000000;
+        --bg-card: #111111;
+        --text-primary: #FFFFFF;
+        --text-secondary: #94A3B8;
+        --border-color: #222222;
+    }
+
+    .stApp { background-color: var(--bg-main); color: var(--text-primary); }
     .brand-title {
-        color: white;
+        color: var(--text-primary);
         text-align: center;
         font-size: 2.5rem;
         font-weight: 800;
         margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
     .brand-sub {
-        color: #94A3B8;
+        color: var(--text-secondary);
         text-align: center;
         font-size: 0.9rem;
         margin-bottom: 2rem;
         letter-spacing: 2px;
     }
     div[data-testid="stForm"] {
-        background: #1E293B !important;
-        border: 1px solid #334155 !important;
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border-color) !important;
         border-radius: 20px !important;
         padding: 2.5rem !important;
     }
     .stTextInput label, .stTextInput input {
-        color: white !important;
+        color: var(--text-primary) !important;
     }
     .stTextInput input {
-        background-color: #0F172A !important;
-        border: 1px solid #334155 !important;
+        background-color: var(--bg-main) !important;
+        border: 1px solid var(--border-color) !important;
     }
     .stButton > button {
         width: 100%;
-        background: #3B82F6 !important;
+        background: linear-gradient(135deg, var(--primary), #1E40AF) !important;
         color: white !important;
         border-radius: 10px !important;
         padding: 12px !important;

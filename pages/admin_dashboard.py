@@ -24,10 +24,52 @@ st.set_page_config(page_title="Synapse | Admin Dashboard", page_icon="📈", lay
 # --- CSS ---
 st.markdown("""
 <style>
-    .main { background-color: #F8FAFC; }
-    .stMetric { background-color: white; padding: 15px; border-radius: 10px; border: 1px solid #E2E8F0; }
+    :root {
+        --primary: #3B82F6;
+        --bg-main: #000000;
+        --bg-card: #111111;
+        --text-primary: #FFFFFF;
+        --border-color: #222222;
+    }
+
+    .stApp { background-color: var(--bg-main); color: var(--text-primary); }
+    
+    div[data-testid="stMetric"] { 
+        background-color: var(--bg-card) !important; 
+        padding: 15px; 
+        border-radius: 10px; 
+        border: 1px solid var(--border-color) !important; 
+    }
+    
     .status-active { color: #10B981; font-weight: 700; }
     .status-suspended { color: #EF4444; font-weight: 700; }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab"] {
+        color: #94A3B8;
+    }
+    .stTabs [aria-selected="true"] {
+        color: var(--primary) !important;
+        font-weight: bold;
+    }
+
+    /* Formulario */
+    div[data-testid="stForm"] {
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 15px !important;
+    }
+    
+    label {
+        color: var(--text-primary) !important;
+    }
+
+    /* Expander */
+    .stExpander {
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 10px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 

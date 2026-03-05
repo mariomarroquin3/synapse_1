@@ -10,6 +10,90 @@ from config.database import get_connection
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
 
+# --- CSS PERSONALIZADO (FUERZA TEMA OSCURO) ---
+st.markdown("""
+<style>
+    :root {
+        --primary: #3B82F6;
+        --secondary: #60A5FA;
+        --bg-main: #000000;
+        --bg-card: #111111;
+        --text-primary: #FFFFFF;
+        --border-color: #222222;
+    }
+
+    .stApp {
+        background-color: var(--bg-main);
+        color: var(--text-primary);
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background-color: var(--bg-card) !important;
+        border-right: 1px solid var(--border-color);
+    }
+
+    /* Cards y Contenedores */
+    div[data-testid="stMetric"] {
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--border-color) !important;
+        padding: 20px !important;
+        border-radius: 15px !important;
+    }
+
+    div[data-testid="stMetric"] label {
+        color: var(--text-primary) !important;
+    }
+
+    div[data-testid="stForm"] {
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 15px !important;
+    }
+    
+    div[data-testid="stForm"] label {
+        color: var(--text-primary) !important;
+    }
+
+    .stDivider {
+        border-color: var(--border-color) !important;
+    }
+
+    /* Botones Premium */
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, var(--primary), #1E40AF) !important;
+        border: none !important;
+        color: white !important;
+    }
+
+    .stButton > button {
+        border-radius: 8px !important;
+        color: var(--text-primary) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    /* Historiales (Containers with border) */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--border-color) !important;
+    }
+
+    /* Subheaders y Captions */
+    h2, h3, .stSubheader {
+        color: var(--text-primary) !important;
+    }
+    
+    .stCaption {
+        color: #94A3B8 !important; /* Texto secundario gris claro */
+    }
+    
+    /* Radio Button labels */
+    div[data-testid="stSidebarNav"] label {
+        color: var(--text-primary) !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- VERIFICACIÓN DE SESIÓN ---
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.error("No has iniciado sesión.")
@@ -194,9 +278,15 @@ elif menu == "Mis Tarjetas":
         if cards:
             cols = st.columns(2)
             for idx, card in enumerate(cards):
-                # card = (Id_card, account_id, card_type_id, card_number, pin, holder_name, expiration_date, is_active, created_at)
-                card_id, _, type_id, card_number, pin, holder, exp_date, is_active, _ = card
-                last4 = str(card_number)[-4:] if card_number else "****"
+                # card es ahora un diccionario
+                card_id = card.get("Id_card")
+                type_id = card.get("card_type_id")
+                card_number = card.get("card_number_last4")
+                holder = card.get("holder_name")
+                exp_date = card.get("expiration_date")
+                is_active = card.get("is_active")
+                
+                last4 = str(card_number) if card_number else "****"
                 
                 with cols[idx % 2]:
                     with st.container(border=True):
@@ -213,7 +303,7 @@ elif menu == "Mis Tarjetas":
                             st.write(f"**Vence:**\n{exp_str}")
                         
                         status_text = "ACTIVA" if is_active else "BLOQUEADA"
-                        status_color = "green" if is_active else "red"
+                        status_color = "#10B981" if is_active else "#EF4444"
                         st.markdown(f"Estado: <span style='color:{status_color}; font-weight:bold;'>{status_text}</span>", unsafe_allow_html=True)
                         
                         st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")

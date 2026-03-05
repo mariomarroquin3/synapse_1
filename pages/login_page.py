@@ -56,16 +56,22 @@ st.markdown("""
 
     /* Variables de Estilo */
     :root {
-        --primary: #0047AB;
-        --secondary: #00B4D8;
+        --primary: #3B82F6;
+        --secondary: #60A5FA;
+        --bg-main: #000000;
+        --bg-card: #111111;
+        --text-primary: #FFFFFF;
+        --text-secondary: #94A3B8;
+        --border-color: #222222;
     }
 
     html, body, [class*="st-"] { 
         font-family: 'Plus Jakarta Sans', sans-serif; 
+        color: var(--text-primary);
     }
     
     .stApp { 
-        background-color: #F8FAFC;
+        background-color: var(--bg-main);
     }
 
     /* Hero Section */
@@ -83,7 +89,7 @@ st.markdown("""
         letter-spacing: -1.5px;
     }
     .brand-sub {
-        color: #64748B;
+        color: var(--text-secondary);
         font-size: 0.8rem;
         font-weight: 600;
         letter-spacing: 1.5px;
@@ -100,39 +106,48 @@ st.markdown("""
         background-color: transparent;
         border-radius: 12px 12px 0 0;
         padding: 10px 20px;
-        color: #94A3B8;
+        color: var(--text-secondary);
         border: none !important;
     }
     .stTabs [aria-selected="true"] {
         color: var(--primary) !important;
         font-weight: 700 !important;
-        background-color: white !important;
+        background-color: var(--bg-card) !important;
     }
 
     /* Formulario como Card */
     div[data-testid="stForm"] {
-        background: white !important;
-        border: 1px solid #E2E8F0 !important;
+        background: var(--bg-card) !important;
+        border: 1px solid var(--border-color) !important;
         border-radius: 0px 0px 20px 20px !important;
         padding: 2.5rem !important;
-        box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.05) !important;
+        box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.2) !important;
         margin-top: 0px !important;
     }
 
     /* Estilo de Inputs */
+    .stTextInput label {
+        color: var(--text-primary) !important;
+    }
     .stTextInput input {
         border-radius: 10px !important;
-        background-color: #F8FAFC !important;
-        border: 1px solid #E2E8F0 !important;
+        background-color: var(--bg-main) !important;
+        border: 1px solid var(--border-color) !important;
+        color: var(--text-primary) !important;
     }
     .stTextInput input:focus {
         border-color: var(--primary) !important;
     }
 
+    /* Selectbox */
+    .stSelectbox label {
+        color: var(--text-primary) !important;
+    }
+
     /* Botón */
     .stButton > button {
         width: 100%;
-        background: linear-gradient(135deg, var(--primary), #003380) !important;
+        background: linear-gradient(135deg, var(--primary), #1E40AF) !important;
         color: white !important;
         border-radius: 10px !important;
         padding: 12px !important;
@@ -160,7 +175,7 @@ tab_login, tab_reg = st.tabs(["🔐 ACCESO", "📝 REGISTRO"])
 
 with tab_login:
     with st.form("login_form_final"):
-        st.markdown("<h4 style='text-align:center; margin-bottom:25px; color:#0F172A;'>Inicia Sesión</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='text-align:center; margin-bottom:25px; color:var(--text-primary);'>Inicia Sesión</h4>", unsafe_allow_html=True)
         l_email = st.text_input("Correo electrónico", placeholder="usuario@correo.com")
         l_pass = st.text_input("Contraseña", type="password", placeholder="••••••••")
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
@@ -193,7 +208,7 @@ with tab_login:
 
 with tab_reg:
     with st.form("reg_form_final"):
-        st.markdown("<h4 style='margin-bottom:25px; color:#0F172A;'>Crea tu cuenta</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-bottom:25px; color:var(--text-primary);'>Crea tu cuenta</h4>", unsafe_allow_html=True)
         r_col1, r_col2 = st.columns(2)
         with r_col1:
             r_name_raw = st.text_input("Nombre", placeholder="Tu nombre completo")
