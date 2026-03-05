@@ -12,19 +12,29 @@ def count_cards_by_account(account_id: int) -> int:
 
 # models/card_model.py
 
-def insert_card(account_id: int, card_type_id: int, last4: str, token: str, holder_name: str, exp_date: Any) -> int:
+def insert_card(account_id: int, card_type_id: int, card_number: str, pin: str, holder_name: str, exp_date: Any) -> int:
     """
-    Inserta la tarjeta. exp_date ahora acepta un objeto datetime 
-    para ser compatible con el tipo Fecha/Hora de Access.
+    Inserta una tarjeta con número completo (16 dígitos) y PIN de 4 dígitos.
+    
+    Args:
+        account_id: ID de la cuenta propietaria
+        card_type_id: Tipo de tarjeta (1=Débito, 2=Virtual, etc.)
+        card_number: Número completo de 16 dígitos
+        pin: PIN de 4 dígitos para validación
+        holder_name: Nombre del titular
+        exp_date: Fecha de expiración (datetime)
+        
+    Returns:
+        int: ID de la tarjeta insertada
     """
     query = """
         INSERT INTO [card] (
-            [account_id], [card_type_id], [card_number_last4], 
-            [card_token], [holder_name], [expiration_date], [created_at]
+            [account_id], [card_type_id], [card_number], 
+            [pin], [holder_name], [expiration_date], [created_at]
         ) VALUES (?, ?, ?, ?, ?, ?, Now())
     """
     with get_cursor(commit=True) as cursor:
-        cursor.execute(query, (account_id, card_type_id, last4, token, holder_name, exp_date))
+        cursor.execute(query, (account_id, card_type_id, card_number, pin, holder_name, exp_date))
         
         cursor.execute("SELECT @@IDENTITY")
         row = cursor.fetchone()
@@ -32,45 +42,50 @@ def insert_card(account_id: int, card_type_id: int, last4: str, token: str, hold
             raise Exception("Error al recuperar ID de tarjeta.")
         return int(row[0])
 
-def get_card_by_token(card_token: str):
-    """Busca una tarjeta usando su token de seguridad."""
-    query = "SELECT * FROM [card] WHERE [card_token] = ?"
+def get_card_by_number(card_number: str):
+    """Busca una tarjeta usando su número completo de 16 dígitos."""
+    query = "SELECT * FROM [card] WHERE [card_number] = ?"
     with get_cursor() as cursor:
-        cursor.execute(query, (card_token,))
-        return cursor.fetchone() # Aquí devolvemos la tupla completa o None
+        cursor.execute(query, (card_number,))
+        return cursor.fetchone() # Devuelve la tupla completa o None
     
 def get_cards_by_account(account_id: int):
     """
     Recupera todas las tarjetas asociadas a una cuenta.
+    
+    Returns:
+        list: Lista de tuplas con (Id_card, account_id, card_type_id, card_number, pin, holder_name, expiration_date, is_active, created_at)
     """
     query = """
         SELECT [Id_card], [account_id], [card_type_id], 
-               [card_number_last4], [card_token], [holder_name], 
-               [expiration_date], [created_at]
+               [card_number], [pin], [holder_name], 
+               [expiration_date], [is_active], [created_at]
         FROM [card] 
         WHERE [account_id] = ?
     """
     with get_cursor() as cursor:
         cursor.execute(query, (account_id,))
-        # fetchall() devuelve una lista de tuplas
         return cursor.fetchall()
     # Tarjetas 8-2
 def get_card_with_user(account_id: int):
     """
-    Obtiene la tarjeta junto con el nombre real del usuario
-    compatible con Microsoft Access.
+    
+    Returns:
+        tuple: (Id_card, card_number, expiration_date, full_name) o None
     """
 
     query = """
         SELECT 
             c.Id_card,
-            c.card_number_last4,
+            c.card_number,
             c.expiration_date,
             u.full_name
         FROM 
             ([card] AS c 
             INNER JOIN [account] AS a 
-                ON c.account_id = a.id_account)
+                ON c.account_id = a.Id_account)
+        INNER JOIN [user] AS u 
+            ON a.user_id = u.Id = a.id_account)
         INNER JOIN [user] AS u 
             ON a.user_id = u.id_user
         WHERE 

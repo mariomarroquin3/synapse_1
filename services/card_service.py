@@ -1,4 +1,5 @@
 import uuid
+import random
 from datetime import datetime, timedelta
 from typing import Any, Dict # Importamos para tipado explícito
 
@@ -10,9 +11,20 @@ def create_card_for_account(
     card_type_id: int, 
     holder_name: str, 
     full_card_number: str
-) -> Dict[str, Any]: # <--- Esto elimina el aviso de "Unknown"
+) -> Dict[str, Any]:
     """
     Lógica de negocio para emitir una nueva tarjeta.
+    
+    Genera un PIN de 4 dígitos aleatorio y valida el número con Luhn.
+    
+    Args:
+        account_id: ID de la cuenta propietaria
+        card_type_id: Tipo de tarjeta
+        holder_name: Nombre del titular
+        full_card_number: Número completo de 16 dígitos
+        
+    Returns:
+        dict: {'success': bool, 'card_id': int, 'pin': str, 'last4': str, 'error': str}
     """
     
     #1. REGLA DE NEGOCIO: Máximo 2 tarjetas
@@ -28,12 +40,11 @@ def create_card_for_account(
     if not is_luhn_valid(clean_number):
         return {"success": False, "error": "Número de tarjeta inválido."}
 
-    # 3. SEGURIDAD Y DATOS
+    # 3. GENERAR PIN DE 4 DÍGITOS
+    pin = f"{random.randint(1000, 9999)}"
     last4 = clean_number[-4:]
-    card_token = f"tok_{uuid.uuid4().hex}" 
     
-    # 4. FECHA DE EXPIRACIÓN (Para el tipo Fecha/Hora de Access)
-    # Creamos un objeto datetime real (el primer día del mes en 3 años)
+    # 4. FECHA DE EXPIRACIÓN
     exp_date = datetime.now() + timedelta(days=3*365)
 
     # 5. INSERCIÓN
@@ -41,8 +52,8 @@ def create_card_for_account(
         new_card_id = insert_card(
             account_id=account_id, 
             card_type_id=card_type_id, 
-            last4=last4, 
-            token=card_token, 
+            card_number=clean_number,
+            pin=pin,
             holder_name=holder_name, 
             exp_date=exp_date
         )
@@ -50,7 +61,7 @@ def create_card_for_account(
         return {
             "success": True, 
             "card_id": int(new_card_id), 
-            "token": str(card_token), 
+            "pin": str(pin), 
             "last4": str(last4)
         }
         
@@ -62,27 +73,27 @@ def create_card_for_account(
 # Validación y gestión de estado de tarjetas
 # ─────────────────────────────────────────────
 
-def validate_card_for_transaction(cursor: Any, card_number: str, input_token: str) -> Dict[str, Any]:
+def validate_card_for_transaction(cursor: Any, card_number: str, input_pin: str) -> Dict[str, Any]:
     """
     Valida una tarjeta para ser utilizada en una transacción.
     
     Validaciones:
-    1. La tarjeta existe en la tabla [card] usando card_number_last4
+    1. La tarjeta existe en la tabla [card] usando el número completo (16 dígitos)
     2. is_active es True
     3. expiration_date > fecha actual
-    4. card_token coincide con input_token
-    5. Token debe ser proporcionado explícitamente
+    4. PIN proporcionado coincide con el almacenado (4 dígitos)
     
     Args:
         cursor: Cursor pyodbc activo (no abre conexión)
-        card_number: Número de tarjeta a validar (puede ser 4 o 16 dígitos)
-        input_token: Token proporcionado para validación (REQUERIDO)
+        card_number: Número completo de 16 dígitos
+        input_pin: PIN de 4 dígitos proporcionado para validación
         
     Returns:
         dict: {
             'success': bool,
             'account_id': int | None,
-            'error': str | None
+            'error': str | None,
+            'last4': str | None  # Últimos 4 dígitos
         }
     
     Raises:
@@ -90,56 +101,58 @@ def validate_card_for_transaction(cursor: Any, card_number: str, input_token: st
     """
     
     # ─────────────────────────────────────────────────────────────────────
-    # VALIDACIÓN ESTRICTA: Token debe ser requerido
+    # VALIDACIÓN ESTRICTA: PIN debe ser requerido
     # ─────────────────────────────────────────────────────────────────────
-    if not input_token or (isinstance(input_token, str) and input_token.strip() == ""):
-        print(f"[CARD_SERVICE] ❌ Token requerido para validación")
-        return {"success": False, "error": "Token de tarjeta requerido", "account_id": None}
+    if not input_pin or (isinstance(input_pin, str) and input_pin.strip() == ""):
+        print(f"[CARD_SERVICE] ❌ PIN requerido para validación")
+        return {"success": False, "error": "PIN de tarjeta requerido", "account_id": None, "last4": None}
+    
+    if len(str(input_pin).strip()) != 4:
+        print(f"[CARD_SERVICE] ❌ PIN debe tener exactamente 4 dígitos")
+        return {"success": False, "error": "PIN debe tener 4 dígitos", "account_id": None, "last4": None}
     
     # ─────────────────────────────────────────────────────────────────────
-    # ENTRADA: Slice automático si tiene 16 dígitos
+    # LIMPIAR NÚMERO DE TARJETA
     # ─────────────────────────────────────────────────────────────────────
-    search_number = card_number
-    if len(str(card_number).replace(" ", "").replace("-", "")) == 16:
-        # Si tiene 16 dígitos, extraer últimos 4
-        search_number = str(card_number).replace(" ", "").replace("-", "")[-4:]
+    clean_card_number = str(card_number).replace(" ", "").replace("-", "")
+    last4 = clean_card_number[-4:]
     
-    print(f"[CARD_SERVICE] Validando tarjeta: {search_number}...")
+    print(f"[CARD_SERVICE] Validando tarjeta: {last4}...")
     
     try:
-        # Búsqueda 1: Encontrar tarjeta por card_number_last4
+        # Búsqueda: Encontrar tarjeta por número completo
         query = """
-            SELECT [Id_card], [account_id], [card_token], [is_active], [expiration_date]
+            SELECT [Id_card], [account_id], [pin], [is_active], [expiration_date]
             FROM [card]
-            WHERE [card_number_last4] = ?
+            WHERE [card_number] = ?
         """
-        cursor.execute(query, (search_number,))
+        cursor.execute(query, (clean_card_number,))
         row = cursor.fetchone()
         
         # Validación 1: Tarjeta existe
         if not row:
             print(f"[CARD_SERVICE] ❌ Tarjeta no encontrada")
-            return {"success": False, "error": "Tarjeta no encontrada", "account_id": None}
+            return {"success": False, "error": "Tarjeta no encontrada", "account_id": None, "last4": None}
         
-        card_id, account_id, stored_token, is_active, expiration_date = row
+        card_id, account_id, stored_pin, is_active, expiration_date = row
         
         # Validación 2: Tarjeta está activa
         if not is_active:
             print(f"[CARD_SERVICE] ❌ Tarjeta bloqueada")
-            return {"success": False, "error": "La tarjeta está bloqueada", "account_id": None}
+            return {"success": False, "error": "La tarjeta está bloqueada", "account_id": None, "last4": None}
         
         # Validación 3: Fecha de expiración válida
         if expiration_date < datetime.now():
             print(f"[CARD_SERVICE] ❌ Tarjeta vencida")
-            return {"success": False, "error": "Tarjeta vencida", "account_id": None}
+            return {"success": False, "error": "Tarjeta vencida", "account_id": None, "last4": None}
         
-        # Validación 4: Token coincide
-        if stored_token != input_token:
-            print(f"[CARD_SERVICE] ❌ Token inválido")
-            return {"success": False, "error": "Token de tarjeta inválido", "account_id": None}
+        # Validación 4: PIN coincide
+        if str(stored_pin).strip() != str(input_pin).strip():
+            print(f"[CARD_SERVICE] ❌ PIN inválido")
+            return {"success": False, "error": "PIN de tarjeta incorrecto", "account_id": None, "last4": None}
         
         print(f"[CARD_SERVICE] ✅ Tarjeta validada correctamente (Cuenta: {account_id})")
-        return {"success": True, "account_id": account_id, "error": None}
+        return {"success": True, "account_id": account_id, "error": None, "last4": last4}
         
     except Exception as e:
         print(f"[CARD_SERVICE] ❌ Error en validación: {str(e)}")

@@ -174,11 +174,12 @@ def create_simple_transaction(account_id: int, amount: float,
                                transaction_type_id: int, 
                                status_id: int = 1,
                                card_number: str | None = None,
-                               card_token: str | None = None) -> dict[str, Any]:
+                               pin: str | None = None) -> dict[str, Any]:
     """
-    Crea una transacción simple (depósito, retiro, etc).
+    Crea una transacción simple (depósito, retiro, pago con tarjeta, etc).
     
     Si card_number se proporciona, valida la tarjeta antes de procesar.
+    Si se usó tarjeta, se añaden los últimos 4 dígitos a la descripción.
     
     Args:
         account_id: Cuenta a afectar
@@ -188,8 +189,8 @@ def create_simple_transaction(account_id: int, amount: float,
         created_by_user_id: Usuario que crea la transacción
         transaction_type_id: Tipo de transacción (2=Retiro, 3=Depósito, 4=Pago)
         status_id: Estado de la transacción (default=1=Pending)
-        card_number: Número de tarjeta (opcional, para transacciones con tarjeta)
-        card_token: Token de tarjeta (requerido si card_number se proporciona)
+        card_number: Número de tarjeta (opcional, 16 dígitos)
+        pin: PIN de tarjeta (requerido si card_number se proporciona)
         
     Returns:
         dict: {'success': bool, 'transaction_id': int | None, 'ledger_entry_id': int | None}
@@ -217,15 +218,16 @@ def create_simple_transaction(account_id: int, amount: float,
         cursor = conn.cursor()
         
         # VALIDACIÓN OPCIONAL: Si se proporciona card_number, validar tarjeta
+        last4_for_description = None
         if card_number is not None:
             print(f"[TX_SERVICE] Validando tarjeta para transacción...")
-            if card_token is None:
-                return {"success": False, "error": "card_token es requerido cuando se proporciona card_number"}
+            if pin is None:
+                return {"success": False, "error": "PIN es requerido cuando se proporciona card_number"}
             
             # Importar aquí para evitar dependencias circulares
             from services.card_service import validate_card_for_transaction
             
-            card_validation = validate_card_for_transaction(cursor, card_number, card_token)
+            card_validation = validate_card_for_transaction(cursor, card_number, pin)
             if not card_validation["success"]:
                 return {
                     "success": False, 
@@ -240,9 +242,16 @@ def create_simple_transaction(account_id: int, amount: float,
                     "error": f"La tarjeta no pertenece a esta cuenta (Tarjeta: {card_account_id}, Cuenta: {account_id})"
                 }
             
+            # Obtener últimos 4 dígitos para agregar a la descripción
+            last4_for_description = card_validation.get("last4")
             print(f"[TX_SERVICE] ✅ Tarjeta validada correctamente")
 
-        tx_id = _insert_transaction(cursor, transaction_type_id, status_id, description, created_by_user_id)
+        # Actualizar descripción si se usó tarjeta
+        final_description = description
+        if last4_for_description:
+            final_description = f"{description} (Tarj. ****{last4_for_description})"
+
+        tx_id = _insert_transaction(cursor, transaction_type_id, status_id, final_description, created_by_user_id)
         ledger_id = create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=entry_type)
 
         conn.commit()

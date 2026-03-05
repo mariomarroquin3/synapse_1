@@ -194,15 +194,15 @@ elif menu == "Mis Tarjetas":
         if cards:
             cols = st.columns(2)
             for idx, card in enumerate(cards):
-                # card = (Id_card, account_id, card_type_id, last4, token, holder_name, exp_date, created_at)
-                card_id, _, type_id, last4, token, holder, exp_date, _ = card
-                is_active = True # Default since column is missing
+                # card = (Id_card, account_id, card_type_id, card_number, pin, holder_name, expiration_date, is_active, created_at)
+                card_id, _, type_id, card_number, pin, holder, exp_date, is_active, _ = card
+                last4 = str(card_number)[-4:] if card_number else "****"
                 
                 with cols[idx % 2]:
                     with st.container(border=True):
                         # Estética de tarjeta "Premium"
                         type_label = "DÉBITO" if type_id == 1 else "VIRTUAL"
-                        st.caption(f"TARJETA  {type_label}")
+                        st.caption(f"TARJETA {type_label}")
                         st.markdown(f"#### **** **** **** {last4}")
                         
                         subcol1, subcol2 = st.columns(2)
@@ -212,7 +212,9 @@ elif menu == "Mis Tarjetas":
                             exp_str = exp_date.strftime("%m/%y") if exp_date else "--/--"
                             st.write(f"**Vence:**\n{exp_str}")
                         
-                        st.markdown(f"Estado: <span style='color:green; font-weight:bold;'>ACTIVA</span>", unsafe_allow_html=True)
+                        status_text = "ACTIVA" if is_active else "BLOQUEADA"
+                        status_color = "green" if is_active else "red"
+                        st.markdown(f"Estado: <span style='color:{status_color}; font-weight:bold;'>{status_text}</span>", unsafe_allow_html=True)
                         
                         st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
         else:
@@ -249,7 +251,10 @@ elif menu == "Mis Tarjetas":
                                 )
                                 
                                 if result.get("success"):
-                                    st.success(f"¡Tarjeta emitida con éxito! Terminación: {result['last4']}")
+                                    st.success(f"¡Tarjeta emitida con éxito!")
+                                    st.info(f"**Número:** {full_number}")
+                                    st.warning(f"**PIN:** {result['pin']} - Guardar en lugar seguro")
+                                    st.info(f"**Últimos 4 dígitos:** {result['last4']}")
                                     st.balloons()
                                     time.sleep(2)
                                     st.rerun()
