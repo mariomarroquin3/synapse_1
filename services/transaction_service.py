@@ -240,21 +240,12 @@ def create_simple_transaction(account_id: int, amount: float,
     Si card_number se proporciona, valida la tarjeta antes de procesar.
     Si se usó tarjeta, se añaden los últimos 4 dígitos a la descripción.
     
-    Args:
-        account_id: Cuenta a afectar
-        amount: Monto de la transacción
-        entry_type: DEBIT o CREDIT
-        description: Descripción del movimiento
-        created_by_user_id: Usuario que crea la transacción
-        transaction_type_id: Tipo de transacción (2=Retiro, 3=Depósito, 4=Pago)
-        status_id: Estado de la transacción (default=3=Finalizada)
-        card_number: Número de tarjeta (opcional, 16 dígitos)
-        pin: PIN de tarjeta (requerido si card_number se proporciona)
-        
     Returns:
-        dict: {'success': bool, 'transaction_id': int | None, 'ledger_entry_id': int | None}
+        dict: {'success': bool, 'transaction_id': int | None, 'requires_approval': bool, 'error': str}
     """
     
+    print(f"\n[TX_SERVICE] ── Iniciando transacción simple (ID Tipo: {transaction_type_id}) ───────────────")
+
     if amount <= 0:
         return {"success": False, "error": "El monto debe ser mayor a cero."}
 
@@ -279,42 +270,58 @@ def create_simple_transaction(account_id: int, amount: float,
         # VALIDACIÓN OPCIONAL: Si se proporciona card_number, validar tarjeta
         last4_for_description = None
         if card_number is not None:
-            print(f"[TX_SERVICE] Validando tarjeta para transacción...")
             if pin is None:
                 return {"success": False, "error": "PIN es requerido cuando se proporciona card_number"}
             
-            # Importar aquí para evitar dependencias circulares
             from services.card_service import validate_card_for_transaction
-            
             card_validation = validate_card_for_transaction(cursor, card_number, pin)
             if not card_validation["success"]:
-                return {
-                    "success": False, 
-                    "error": card_validation["error"]
-                }
+                return {"success": False, "error": card_validation["error"]}
             
-            # Verificar que la tarjeta pertenece a la cuenta correcta
             card_account_id = card_validation["account_id"]
             if card_account_id != account_id:
-                return {
-                    "success": False,
-                    "error": f"La tarjeta no pertenece a esta cuenta (Tarjeta: {card_account_id}, Cuenta: {account_id})"
-                }
+                return {"success": False, "error": "La tarjeta no pertenece a esta cuenta."}
             
-            # Obtener últimos 4 dígitos para agregar a la descripción
             last4_for_description = card_validation.get("last4")
-            print(f"[TX_SERVICE] ✅ Tarjeta validada correctamente")
 
-        # Actualizar descripción si se usó tarjeta
         final_description = description
         if last4_for_description:
             final_description = f"{description} (Tarj. ****{last4_for_description})"
 
-        tx_id = _insert_transaction(cursor, transaction_type_id, status_id, final_description, created_by_user_id)
-        ledger_id = create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=entry_type)
-
-        conn.commit()
-        return {"success": True, "transaction_id": tx_id, "ledger_entry_id": ledger_id}
+        # ─────────────────────────────────────────────────────────────────────
+        # CONTROL DE APROBACIÓN POR MONTO
+        # ─────────────────────────────────────────────────────────────────────
+        if amount >= 10000.0:
+            print(f"[TX_SERVICE] Monto ${amount} >= $10,000. Requiere aprobación manual.")
+            status_id = 2  # Pendiente
+            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, final_description, created_by_user_id)
+            
+            # Registrar en tabla de aprobaciones
+            # Para transacciones simples, from_account_id o to_account_id se repiten según el tipo
+            from_acc = account_id if is_debit else None
+            to_acc = account_id if not is_debit else None
+            
+            sql_approval = """
+                INSERT INTO transaction_approvals
+                    (transaction_id, from_account_id, to_account_id, amount, created_at)
+                VALUES (?, ?, ?, ?, Now())
+            """
+            cursor.execute(sql_approval, (tx_id, from_acc, to_acc, amount))
+            conn.commit()
+            
+            return {
+                "success": True, 
+                "transaction_id": tx_id, 
+                "requires_approval": True,
+                "message": "Transacción retenida para aprobación administrativa."
+            }
+        
+        else:
+            # Transacción normal
+            tx_id = _insert_transaction(cursor, transaction_type_id, 3, final_description, created_by_user_id)
+            create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=entry_type)
+            conn.commit()
+            return {"success": True, "transaction_id": tx_id, "requires_approval": False}
 
     except Exception as e:
         if conn: conn.rollback()
@@ -352,25 +359,11 @@ def get_account_history_by_type(account_id: int, transaction_type_id: int) -> li
 # Revisión y Aprobación de Transferencias
 # ─────────────────────────────────────────────
 
-def review_pending_transfer(transaction_id: int, admin_id: int, is_approved: bool, review_note: str | None = None) -> dict[str, Any]:
+def review_transaction(transaction_id: int, admin_id: int, is_approved: bool, review_notes: str | None = None) -> dict[str, Any]:
     """
-    Revisa y procesa una transferencia pendiente de aprobación.
-    
-    Actualiza la tabla transaction_approvals con la decisión del administrador.
-    - Si es_aprobada: Actualiza status a 3 (Finalizada) e inserta movimientos en ledger
-    - Si es_rechazada: Actualiza status a 5 (Rechazada), sin tocar ledger
-    
-    Args:
-        transaction_id: ID de la transacción a revisar
-        admin_id: ID del administrador que revisa
-        is_approved: True para aprobar, False para rechazar
-        review_note: Nota opcional del administrador (aprobación/rechazo)
-        
-    Returns:
-        dict: {'success': bool, 'message': str, 'error': str | None}
+    Revisa y procesa cualquier transacción pendiente (Transferencia, Retiro, Depósito).
     """
-    
-    print(f"\\n[TX_SERVICE] ─── Revisando Transferencia Pendiente (TX: {transaction_id}) ───────────")
+    print(f"\n[TX_SERVICE] ─── Revisando Transacción (TX: {transaction_id}) ───────────")
     
     conn = None
     cursor = None
@@ -379,75 +372,50 @@ def review_pending_transfer(transaction_id: int, admin_id: int, is_approved: boo
         conn = get_connection()
         cursor = conn.cursor()
         
-        # 1. OBTENER DATOS DE LA APROBACIÓN
-        sql_get_approval = "SELECT from_account_id, to_account_id, amount FROM transaction_approvals WHERE transaction_id = ?"
-        cursor.execute(sql_get_approval, (transaction_id,))
-        approval_row = cursor.fetchone()
-        
-        if not approval_row:
-            return {"success": False, "error": f"No se encontró aprobación pendiente para transacción {transaction_id}"}
-        
-        from_account_id, to_account_id, amount = approval_row
-        print(f"[TX_SERVICE] Aprobación encontrada: {from_account_id} → {to_account_id} por ${amount}")
-        
-        # 2. ACTUALIZAR transaction_approvals
-        sql_update_approval = """
-            UPDATE transaction_approvals
-            SET admin_id = ?, review_note = ?, reviewed_at = ?
-            WHERE transaction_id = ?
+        # 1. Obtener datos y tipo de transacción
+        sql_info = """
+            SELECT t.transaction_type_id, a.from_account_id, a.to_account_id, a.amount 
+            FROM ([transaction] t
+            INNER JOIN transaction_approvals a ON t.Id_transaction = a.transaction_id)
+            WHERE t.Id_transaction = ?
         """
-        now = datetime.now()
-        cursor.execute(sql_update_approval, (admin_id, review_note, now, transaction_id))
-        print(f"[TX_SERVICE] Registro de aprobación actualizado")
+        cursor.execute(sql_info, (transaction_id,))
+        row = cursor.fetchone()
         
-        # 3. PROCESAR SEGÚN DECISIÓN
+        if not row:
+            return {"success": False, "error": "Transacción no encontrada en aprobaciones."}
+        
+        type_id, from_acc, to_acc, amount = row
+        
+        # 2. Actualizar registro de aprobación
+        sql_upd = "UPDATE transaction_approvals SET admin_id = ?, review_notes = ?, reviewed_at = Now() WHERE transaction_id = ?"
+        cursor.execute(sql_upd, (admin_id, review_notes, transaction_id))
+        
         if is_approved:
-            # ✅ APROBADA: Actualizar status a 3 (Finalizada) + insertar ledger
-            print(f"[TX_SERVICE] ✅ APROBADA por Admin {admin_id}")
+            print(f"[TX_SERVICE] ✅ APROBADA")
+            # Actualizar status a 3 (Finalizada)
+            cursor.execute("UPDATE [transaction] SET status_id = 3 WHERE Id_transaction = ?", (transaction_id,))
             
-            status_id = 3  # Finalizada
-            sql_update_tx = "UPDATE [transaction] SET status_id = ? WHERE Id_transaction = ?"
-            cursor.execute(sql_update_tx, (status_id, transaction_id))
-            
-            # Inserta los movimientos en ledger
-            create_ledger_entry(
-                cursor=cursor,
-                transaction_id=transaction_id,
-                account_id=from_account_id,
-                amount=amount,
-                entry_type=DEBIT
-            )
-            create_ledger_entry(
-                cursor=cursor,
-                transaction_id=transaction_id,
-                account_id=to_account_id,
-                amount=amount,
-                entry_type=CREDIT
-            )
+            # Insertar en Ledger según el tipo
+            if type_id == 1: # Transferencia
+                create_ledger_entry(cursor, transaction_id, from_acc, amount, DEBIT)
+                create_ledger_entry(cursor, transaction_id, to_acc, amount, CREDIT)
+            elif type_id == 2 or type_id == 4: # Retiro o Pago de tarjeta (Salida)
+                create_ledger_entry(cursor, transaction_id, from_acc, amount, DEBIT)
+            elif type_id == 3: # Depósito (Entrada)
+                create_ledger_entry(cursor, transaction_id, to_acc, amount, CREDIT)
             
             conn.commit()
-            return {
-                "success": True,
-                "message": f"Transferencia {transaction_id} aprobada y procesada. Movimientos insertados en ledger."
-            }
-        
+            return {"success": True, "message": "Transacción aprobada y procesada."}
         else:
-            # ❌ RECHAZADA: Actualizar status a 5 (Rechazada), SIN tocar ledger
-            print(f"[TX_SERVICE] ❌ RECHAZADA por Admin {admin_id}")
-            
-            status_id = 5  # Rechazada
-            sql_update_tx = "UPDATE [transaction] SET status_id = ? WHERE Id_transaction = ?"
-            cursor.execute(sql_update_tx, (status_id, transaction_id))
-            
+            print(f"[TX_SERVICE] ❌ RECHAZADA")
+            # Actualizar status a 5 (Rechazada)
+            cursor.execute("UPDATE [transaction] SET status_id = 5 WHERE Id_transaction = ?", (transaction_id,))
             conn.commit()
-            return {
-                "success": True,
-                "message": f"Transferencia {transaction_id} rechazada. No se insertaron movimientos."
-            }
-    
+            return {"success": True, "message": "Transacción rechazada."}
+            
     except Exception as e:
         if conn: conn.rollback()
-        print(f"[TX_SERVICE] ❌ Error durante revisión: {str(e)}")
         return {"success": False, "error": str(e)}
     finally:
         if cursor: cursor.close()

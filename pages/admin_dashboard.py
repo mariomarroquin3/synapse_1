@@ -11,6 +11,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # --- IMPORTACIONES ---
 from models.user_model import get_users_by_role_category, update_user_status
 from services.user_service import register_user_with_permissions
+from services.transaction_service import review_transaction
+from config.database import get_cursor
 
 # --- SEGURIDAD DE PÁGINA ---
 if "user_data" not in st.session_state or st.session_state["user_data"]["role_id"] != 3:
@@ -76,7 +78,7 @@ st.markdown("""
 st.title("🛡️ Panel de Control Administrativo")
 st.write(f"Bienvenido, **{st.session_state['user_data']['full_name']}**")
 
-tab1, tab2, tab3 = st.tabs(["👥 Gestión de Personal", "💳 Gestión de Clientes", "⚙️ Configuración"])
+tab1, tab2, tab3, tab4 = st.tabs(["👥 Gestión de Personal", "💳 Gestión de Clientes", "💸 Aprobaciones ($10k+)", "⚙️ Configuración"])
 
 # --- TAB 1: GESTIÓN DE PERSONAL ---
 with tab1:
@@ -162,8 +164,61 @@ with tab2:
     else:
         st.info("No hay clientes registrados en el sistema.")
 
-# --- TAB 3: CONFIGURACIÓN ---
+# --- TAB 3: APROBACIONES ($10K+) ---
 with tab3:
+    st.header("Transacciones Pendientes de Aprobación")
+    st.write("Cualquier movimiento mayor o igual a $10,000 requiere autorización manual.")
+    
+    query = """
+        SELECT 
+            t.Id_transaction, t.description, t.transaction_date, 
+            a.amount, a.from_account_id, a.to_account_id,
+            tt.name AS type_name, u.full_name AS requester
+        FROM (([transaction] t
+        INNER JOIN transaction_approvals a ON t.Id_transaction = a.transaction_id)
+        INNER JOIN transaction_type tt ON t.transaction_type_id = tt.Id_transaction_type)
+        INNER JOIN [user] u ON t.created_by_user_id = u.Id_user
+        WHERE t.status_id = 2
+    """
+    
+    with get_cursor() as cursor:
+        cursor.execute(query)
+        pendientes = cursor.fetchall()
+        
+    if pendientes:
+        for p in pendientes:
+            tx_id, desc, date, amount, from_acc, to_acc, type_name, req = p
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([2, 1, 1])
+                with c1:
+                    st.markdown(f"**ID:** {tx_id} | **Tipo:** {type_name}")
+                    st.markdown(f"**Solicitante:** {req}")
+                    st.markdown(f"**Monto:** `${amount:,.2f}`")
+                    st.caption(f"Fecha: {date.strftime('%d/%m/%Y %H:%M')}")
+                
+                with c2:
+                    st.info(f"De: {from_acc if from_acc else 'N/A'}\nA: {to_acc if to_acc else 'N/A'}")
+                
+                with c3:
+                    note = st.text_input("Nota (opcional)", key=f"note_{tx_id}")
+                    col_b1, col_b2 = st.columns(2)
+                    if col_b1.button("✅ Aprobar", key=f"app_{tx_id}", use_container_width=True):
+                        res = review_transaction(tx_id, st.session_state["user_data"]["Id_user"], True, note)
+                        if res["success"]:
+                            st.success("Aprobada")
+                            st.rerun()
+                        else: st.error(res["error"])
+                    if col_b2.button("❌ Rechazar", key=f"rej_{tx_id}", use_container_width=True):
+                        res = review_transaction(tx_id, st.session_state["user_data"]["Id_user"], False, note)
+                        if res["success"]:
+                            st.warning("Rechazada")
+                            st.rerun()
+                        else: st.error(res["error"])
+    else:
+        st.info("No hay transacciones pendientes de revisión.")
+
+# --- TAB 4: CONFIGURACIÓN ---
+with tab4:
     st.header("Funciones Avanzadas")
     st.write("Configuraciones del sistema y registros de auditoría (Próximamente).")
     if st.button("Cerrar Sesión Administrativa"):
