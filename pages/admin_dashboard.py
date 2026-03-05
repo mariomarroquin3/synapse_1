@@ -193,8 +193,10 @@ with tab3:
                 with c1:
                     st.markdown(f"**ID:** {tx_id} | **Tipo:** {type_name}")
                     st.markdown(f"**Solicitante:** {req}")
-                    st.markdown(f"**Monto:** `${amount:,.2f}`")
-                    st.caption(f"Fecha: {date.strftime('%d/%m/%Y %H:%M')}")
+                    amt_display = float(amount or 0)
+                    st.markdown(f"**Monto:** `${amt_display:,.2f}`")
+                    date_str = date.strftime('%d/%m/%Y %H:%M') if date else "N/A"
+                    st.caption(f"Fecha: {date_str}")
                 
                 with c2:
                     st.info(f"De: {from_acc if from_acc else 'N/A'}\nA: {to_acc if to_acc else 'N/A'}")
