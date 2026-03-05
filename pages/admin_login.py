@@ -9,26 +9,17 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # --- IMPORTACIONES DE LÓGICA ---
 from models.user_model import get_user_by_email
 from utils.security import verify_password
+from utils.ui_components import apply_premium_style
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Synapse | Admin Portal", page_icon="🔐", layout="centered")
 
-# --- CSS PERSONALIZADO ---
-st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-    
-    :root {
-        --primary: #3B82F6;
-        --secondary: #60A5FA;
-        --bg-main: #000000;
-        --bg-card: #111111;
-        --text-primary: #FFFFFF;
-        --text-secondary: #94A3B8;
-        --border-color: #222222;
-    }
+# --- DISEÑO PREMIUM ---
+apply_premium_style()
 
-    .stApp { background-color: var(--bg-main); color: var(--text-primary); }
+# CSS ADICIONAL (Branding de Admin)
+st.markdown("""
+<style>
     .brand-title {
         color: var(--text-primary);
         text-align: center;
@@ -47,28 +38,10 @@ st.markdown("""
         letter-spacing: 2px;
     }
     div[data-testid="stForm"] {
-        background: var(--bg-card) !important;
-        border: 1px solid var(--border-color) !important;
         border-radius: 20px !important;
         padding: 2.5rem !important;
     }
-    .stTextInput label, .stTextInput input {
-        color: var(--text-primary) !important;
-    }
-    .stTextInput input {
-        background-color: var(--bg-main) !important;
-        border: 1px solid var(--border-color) !important;
-    }
-    .stButton > button {
-        width: 100%;
-        background: linear-gradient(135deg, var(--primary), #1E40AF) !important;
-        color: white !important;
-        border-radius: 10px !important;
-        padding: 12px !important;
-        font-weight: 700 !important;
-        border: none !important;
-    }
-    </style>
+</style>
 """, unsafe_allow_html=True)
 
 st.markdown('<h1 class="brand-title">Synapse Admin</h1>', unsafe_allow_html=True)
@@ -78,7 +51,7 @@ with st.form("admin_login_form"):
     st.markdown("<h4 style='text-align:center; color:white; margin-bottom:20px;'>Acceso Restringido</h4>", unsafe_allow_html=True)
     a_email = st.text_input("Usuario Administrativo (Email)", placeholder="admin@synapse.com")
     a_pass = st.text_input("Contraseña", type="password", placeholder="••••••••")
-    submit = st.form_submit_button("INICIAR SESIÓN")
+    submit = st.form_submit_button("INICIAR SESIÓN", type="primary")
 
     if submit:
         if not a_email or not a_pass:

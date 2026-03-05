@@ -1,98 +1,25 @@
 import streamlit as st
 import time
+import sys
+import os
+
+# --- 1. CONFIGURACIÓN DE RUTAS (CRÍTICO: ANTES DE LAS IMPORTACIONES LOCALES) ---
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# --- 2. IMPORTACIONES LOCALES ---
 from models.account_model import get_account_by_user, get_account_by_number
 from models.card_model import get_cards_by_account
 from services.transaction_service import get_account_balance, get_account_history_by_type, create_transfer
 from services.card_service import update_card_active_status, create_card_for_account
 from utils.card_generator import generate_luhn_card_number
 from config.database import get_connection
+from utils.ui_components import apply_premium_style
 
-# --- CONFIGURACIÓN DE PÁGINA ---
+# --- 3. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
 
-# --- CSS PERSONALIZADO (FUERZA TEMA OSCURO) ---
-st.markdown("""
-<style>
-    :root {
-        --primary: #3B82F6;
-        --secondary: #60A5FA;
-        --bg-main: #000000;
-        --bg-card: #111111;
-        --text-primary: #FFFFFF;
-        --border-color: #222222;
-    }
-
-    .stApp {
-        background-color: var(--bg-main);
-        color: var(--text-primary);
-    }
-
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: var(--bg-card) !important;
-        border-right: 1px solid var(--border-color);
-    }
-
-    /* Cards y Contenedores */
-    div[data-testid="stMetric"] {
-        background-color: var(--bg-card) !important;
-        border: 1px solid var(--border-color) !important;
-        padding: 20px !important;
-        border-radius: 15px !important;
-    }
-
-    div[data-testid="stMetric"] label {
-        color: var(--text-primary) !important;
-    }
-
-    div[data-testid="stForm"] {
-        background-color: var(--bg-card) !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: 15px !important;
-    }
-    
-    div[data-testid="stForm"] label {
-        color: var(--text-primary) !important;
-    }
-
-    .stDivider {
-        border-color: var(--border-color) !important;
-    }
-
-    /* Botones Premium */
-    .stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, var(--primary), #1E40AF) !important;
-        border: none !important;
-        color: white !important;
-    }
-
-    .stButton > button {
-        border-radius: 8px !important;
-        color: var(--text-primary) !important;
-        border-color: var(--border-color) !important;
-    }
-
-    /* Historiales (Containers with border) */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: var(--bg-card) !important;
-        border: 1px solid var(--border-color) !important;
-    }
-
-    /* Subheaders y Captions */
-    h2, h3, .stSubheader {
-        color: var(--text-primary) !important;
-    }
-    
-    .stCaption {
-        color: #94A3B8 !important; /* Texto secundario gris claro */
-    }
-    
-    /* Radio Button labels */
-    div[data-testid="stSidebarNav"] label {
-        color: var(--text-primary) !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+# --- 4. DISEÑO PREMIUM ---
+apply_premium_style()
 
 # --- VERIFICACIÓN DE SESIÓN ---
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
@@ -140,8 +67,10 @@ with head_col1:
     dui_display = user.get('DUI', user.get('dui', 'N/A'))
     st.caption(f"DUI: {dui_display} | Cuenta: {account.get('account_number', 'N/A')}")
 with head_col2:
-    if st.button("Cerrar Sesión"):
+    st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
+    if st.button("Cerrar Sesión", type="secondary"):
         logout()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
@@ -150,7 +79,7 @@ menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Mis Ta
 
 # --- BOTÓN DE CAJERO ---
 st.sidebar.divider()
-if st.sidebar.button("🏧 CAJERO", use_container_width=True):
+if st.sidebar.button("🏧 CAJERO", width="stretch", type="primary"):
     st.switch_page("pages/atm_simulator.py")
 
 if menu == "Resumen":
@@ -174,7 +103,9 @@ elif menu == "Transferencias":
             amount_to_transfer = st.number_input("Monto a transferir", min_value=0.01, step=10.0, format="%.2f")
             description = st.text_input("Concepto / Descripción", placeholder="Pago de servicios, almuerzo, etc.")
             
-            submit_transfer = st.form_submit_button("Realizar Transferencia", type="primary", use_container_width=True)
+            st.markdown('<div class="btn-success">', unsafe_allow_html=True)
+            submit_transfer = st.form_submit_button("Realizar Transferencia", type="primary", width="stretch")
+            st.markdown('</div>', unsafe_allow_html=True)
             
             if submit_transfer:
                 if not dest_account_num or amount_to_transfer <= 0 or not description:
@@ -209,10 +140,16 @@ elif menu == "Transferencias":
                                 )
                                 
                                 if result.get("success"):
-                                    st.success(f"¡Transferencia de ${amount_to_transfer:,.2f} realizada exitosamente!")
-                                    st.balloons()
-                                    time.sleep(1)
-                                    st.rerun() # Refrescar para ver nuevo balance
+                                    if result.get("requires_approval"):
+                                        st.info(f"⏳ Transferencia de ${amount_to_transfer:,.2f} retenida para aprobación administrativa.")
+                                        st.warning("La transferencia se completará una vez sea revisada por un administrador.")
+                                        time.sleep(3)
+                                        st.rerun()
+                                    else:
+                                        st.success(f"¡Transferencia de ${amount_to_transfer:,.2f} realizada exitosamente!")
+                                        st.balloons()
+                                        time.sleep(1)
+                                        st.rerun() # Refrescar para ver nuevo balance
                                 else:
                                     st.error(f"Error al procesar la transferencia: {result.get('error')}")
                             else:
@@ -326,7 +263,9 @@ elif menu == "Mis Tarjetas":
                     
                     holder_name = st.text_input("Nombre en la Tarjeta", value=user["full_name"])
                     
+                    st.markdown('<div class="btn-success">', unsafe_allow_html=True)
                     submit_card = st.form_submit_button("Emitir Tarjeta Ahora", type="primary")
+                    st.markdown('</div>', unsafe_allow_html=True)
                     
                     if submit_card:
                         if not holder_name:

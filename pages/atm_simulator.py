@@ -1,7 +1,15 @@
 import streamlit as st
 import time
+import sys
+import os
+
+# --- 1. CONFIGURACIÓN DE RUTAS ---
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# --- 2. IMPORTACIONES LOCALES ---
 from models.account_model import get_account_by_user
 from services.transaction_service import create_simple_transaction, ENTRY_CREDIT, ENTRY_DEBIT, get_account_balance
+from utils.ui_components import apply_premium_style
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="ATM Simulator - Synapse", page_icon="🏧", layout="centered")
@@ -12,6 +20,9 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
     if st.button("Ir al Login"):
         st.switch_page("pages/login_page.py")
     st.stop()
+
+# --- DISEÑO PREMIUM ---
+apply_premium_style()
 
 # --- CARGA DE DATOS ---
 user = st.session_state.user_data
@@ -63,10 +74,10 @@ with tab_dep:
     
     # Opciones rápidas
     col1, col2, col3, col4 = st.columns(4)
-    col1.button("$20", key="dep_20", use_container_width=True, on_click=set_amount_dep, args=(20.0,))
-    col2.button("$50", key="dep_50", use_container_width=True, on_click=set_amount_dep, args=(50.0,))
-    col3.button("$100", key="dep_100", use_container_width=True, on_click=set_amount_dep, args=(100.0,))
-    col4.button("$500", key="dep_500", use_container_width=True, on_click=set_amount_dep, args=(500.0,))
+    col1.button("$20", key="dep_20", width="stretch", on_click=set_amount_dep, args=(20.0,), type="secondary")
+    col2.button("$50", key="dep_50", width="stretch", on_click=set_amount_dep, args=(50.0,), type="secondary")
+    col3.button("$100", key="dep_100", width="stretch", on_click=set_amount_dep, args=(100.0,), type="secondary")
+    col4.button("$500", key="dep_500", width="stretch", on_click=set_amount_dep, args=(500.0,), type="secondary")
     
     amount_to_deposit = st.number_input(
         "Monto a depositar", 
@@ -80,7 +91,8 @@ with tab_dep:
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if st.button("💰 Depositar Dinero", type="primary", use_container_width=True):
+    st.markdown('<div class="btn-success">', unsafe_allow_html=True)
+    if st.button("💰 Depositar Dinero", type="primary", width="stretch"):
         if amount_to_deposit <= 0:
             st.warning("El monto a depositar debe ser mayor a $0.00.")
         else:
@@ -98,11 +110,16 @@ with tab_dep:
                 )
                 
                 if result.get("success"):
-                    st.success(f"¡Depósito de ${amount_to_deposit:,.2f} procesado exitosamente!")
-                    st.balloons()
+                    if result.get("requires_approval"):
+                        st.info(f"⏳ Depósito de ${amount_to_deposit:,.2f} retenido para aprobación administrativa.")
+                        st.warning("El dinero no se reflejará hasta que un administrador lo apruebe.")
+                    else:
+                        st.success(f"¡Depósito de ${amount_to_deposit:,.2f} procesado exitosamente!")
+                        st.balloons()
                     st.session_state.quick_amount_dep = 0.0 # Reiniciar monto
                 else:
                     st.error(f"Error al procesar el depósito: {result.get('error')}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with tab_ret:
     st.markdown("### Seleccione o ingrese el monto a retirar")
@@ -116,10 +133,10 @@ with tab_ret:
     
     # Opciones rápidas
     col1, col2, col3, col4 = st.columns(4)
-    col1.button("$20", key="ret_20", use_container_width=True, on_click=set_amount_ret, args=(20.0,))
-    col2.button("$50", key="ret_50", use_container_width=True, on_click=set_amount_ret, args=(50.0,))
-    col3.button("$100", key="ret_100", use_container_width=True, on_click=set_amount_ret, args=(100.0,))
-    col4.button("$500", key="ret_500", use_container_width=True, on_click=set_amount_ret, args=(500.0,))
+    col1.button("$20", key="ret_20", width="stretch", on_click=set_amount_ret, args=(20.0,), type="secondary")
+    col2.button("$50", key="ret_50", width="stretch", on_click=set_amount_ret, args=(50.0,), type="secondary")
+    col3.button("$100", key="ret_100", width="stretch", on_click=set_amount_ret, args=(100.0,), type="secondary")
+    col4.button("$500", key="ret_500", width="stretch", on_click=set_amount_ret, args=(500.0,), type="secondary")
     
     amount_to_withdraw = st.number_input(
         "Monto a retirar", 
@@ -133,7 +150,7 @@ with tab_ret:
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    if st.button("💵 Retirar Dinero", type="primary", use_container_width=True):
+    if st.button("💵 Retirar Dinero", type="primary", width="stretch"):
         if amount_to_withdraw <= 0:
             st.warning("El monto a retirar debe ser mayor a $0.00.")
         else:
@@ -154,15 +171,21 @@ with tab_ret:
                         status_id=1            # Se asume 1=Completada según los servicios
                     )
                     
+                    st.markdown('<div class="btn-success">', unsafe_allow_html=True)
                     if result.get("success"):
-                        st.success(f"¡Retiro de ${amount_to_withdraw:,.2f} procesado exitosamente!")
-                        st.balloons()
+                        if result.get("requires_approval"):
+                            st.info(f"⏳ Retiro de ${amount_to_withdraw:,.2f} retenido para aprobación administrativa.")
+                            st.warning("La transacción será procesada una vez sea aprobada por un administrador.")
+                        else:
+                            st.success(f"¡Retiro de ${amount_to_withdraw:,.2f} procesado exitosamente!")
+                            st.balloons()
                         st.session_state.quick_amount_ret = 0.0 # Reiniciar monto
                     else:
                         st.error(f"Error al procesar el retiro: {result.get('error')}")
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
-if st.button("⬅️ Volver a Inicio", use_container_width=True):
+if st.button("⬅️ Volver a Inicio", width="stretch", type="secondary"):
     st.session_state.quick_amount_dep = 0.0 # Reiniciar al salir
     st.session_state.quick_amount_ret = 0.0 # Reiniciar al salir
     st.switch_page("pages/home_page.py")

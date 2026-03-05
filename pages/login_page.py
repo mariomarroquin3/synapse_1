@@ -16,146 +16,44 @@ from models.user_model import (
 )
 from services.account_service import create_account_for_user
 from utils.security import hash_password, verify_password
+from utils.ui_components import apply_premium_style
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Synapse | Banca Digital", page_icon="🏦", layout="centered")
 
-# --- CSS AVANZADO: ELIMINACIÓN DE BLOQUES VACÍOS ---
+# --- DISEÑO PREMIUM ---
+apply_premium_style()
+
+# CSS ADICIONAL (Específico de Login)
 st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
-    
-    /* 1. Reset de márgenes y eliminación de espacios en blanco del sistema */
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 0rem !important;
-        max-width: 500px !important;
-    }
-    
-    /* Ocultar elementos de UI de Streamlit */
+<style>
+    .block-container { padding-top: 2rem !important; max-width: 500px !important; }
     header, footer, [data-testid="stHeader"] {
         visibility: hidden !important;
-        height: 0px !important;
         display: none !important;
     }
-    
-    /* 2. ATAQUE AL ESPACIO EN BLANCO: Ocultar contenedores vacíos */
-    div[data-testid="stElementContainer"]:empty,
-    div.stMarkdown:empty,
-    div.element-container:has(.auth-card:empty) {
-        display: none !important;
-        height: 0px !important;
-        margin: 0px !important;
-        padding: 0px !important;
-    }
-
-    /* Reducir el gap vertical de Streamlit */
-    div.stVerticalBlock {
-        gap: 0rem !important;
-    }
-
-    /* Variables de Estilo */
-    :root {
-        --primary: #3B82F6;
-        --secondary: #60A5FA;
-        --bg-main: #000000;
-        --bg-card: #111111;
-        --text-primary: #FFFFFF;
-        --text-secondary: #94A3B8;
-        --border-color: #222222;
-    }
-
-    html, body, [class*="st-"] { 
-        font-family: 'Plus Jakarta Sans', sans-serif; 
-        color: var(--text-primary);
-    }
-    
-    .stApp { 
-        background-color: var(--bg-main);
-    }
-
-    /* Hero Section */
-    .hero-section {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
+    .hero-section { text-align: center; margin-bottom: 2rem; }
     .brand-title {
         background: linear-gradient(135deg, var(--primary), var(--secondary));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-size: 3.2rem;
+        font-size: 3.5rem;
         font-weight: 800;
-        margin-bottom: -5px;
         letter-spacing: -1.5px;
     }
     .brand-sub {
         color: var(--text-secondary);
         font-size: 0.8rem;
         font-weight: 600;
-        letter-spacing: 1.5px;
+        letter-spacing: 2px;
         text-transform: uppercase;
     }
-
-    /* Estilo de Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        justify-content: center;
-        margin-bottom: -1px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: transparent;
-        border-radius: 12px 12px 0 0;
-        padding: 10px 20px;
-        color: var(--text-secondary);
-        border: none !important;
-    }
-    .stTabs [aria-selected="true"] {
-        color: var(--primary) !important;
-        font-weight: 700 !important;
-        background-color: var(--bg-card) !important;
-    }
-
-    /* Formulario como Card */
     div[data-testid="stForm"] {
-        background: var(--bg-card) !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: 0px 0px 20px 20px !important;
-        padding: 2.5rem !important;
-        box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.2) !important;
-        margin-top: 0px !important;
+        border-radius: 0 0 24px 24px !important;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.4) !important;
     }
-
-    /* Estilo de Inputs */
-    .stTextInput label {
-        color: var(--text-primary) !important;
-    }
-    .stTextInput input {
-        border-radius: 10px !important;
-        background-color: var(--bg-main) !important;
-        border: 1px solid var(--border-color) !important;
-        color: var(--text-primary) !important;
-    }
-    .stTextInput input:focus {
-        border-color: var(--primary) !important;
-    }
-
-    /* Selectbox */
-    .stSelectbox label {
-        color: var(--text-primary) !important;
-    }
-
-    /* Botón */
-    .stButton > button {
-        width: 100%;
-        background: linear-gradient(135deg, var(--primary), #1E40AF) !important;
-        color: white !important;
-        border-radius: 10px !important;
-        padding: 12px !important;
-        font-weight: 700 !important;
-        border: none !important;
-        margin-top: 15px !important;
-    }
-    </style>
+    .stTabs [data-baseweb="tab-list"] { justify-content: center; }
+</style>
 """, unsafe_allow_html=True)
 
 # --- FUNCIONES DE LIMPIEZA MANUAL (SIN CALLBACKS) ---
@@ -179,7 +77,7 @@ with tab_login:
         l_email = st.text_input("Correo electrónico", placeholder="usuario@correo.com")
         l_pass = st.text_input("Contraseña", type="password", placeholder="••••••••")
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        submit = st.form_submit_button("ENTRAR AL PORTAL")
+        submit = st.form_submit_button("ENTRAR AL PORTAL", type="primary")
 
         if submit:
             if not l_email or not l_pass:
@@ -222,7 +120,7 @@ with tab_reg:
             r_gen = st.selectbox("Género", ["Masculino", "Femenino", "Otro"])
         
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        btn_reg = st.form_submit_button("REGISTRARME AHORA")
+        btn_reg = st.form_submit_button("REGISTRARME AHORA", type="primary")
 
         if btn_reg:
             # Limpieza manual post-submit (Evita errores de Streamlit Form)

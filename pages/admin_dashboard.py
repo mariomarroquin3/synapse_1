@@ -5,14 +5,15 @@ import re
 import time
 import pandas as pd
 
-# --- CONFIGURACIÓN DE RUTAS ---
+# --- 1. CONFIGURACIÓN DE RUTAS ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# --- IMPORTACIONES ---
+# --- 2. IMPORTACIONES LOCALES ---
 from models.user_model import get_users_by_role_category, update_user_status
 from services.user_service import register_user_with_permissions
 from services.transaction_service import review_transaction
 from config.database import get_cursor
+from utils.ui_components import apply_premium_style
 
 # --- SEGURIDAD DE PÁGINA ---
 if "user_data" not in st.session_state or st.session_state["user_data"]["role_id"] != 3:
@@ -23,55 +24,14 @@ if "user_data" not in st.session_state or st.session_state["user_data"]["role_id
 
 st.set_page_config(page_title="Synapse | Admin Dashboard", page_icon="📈", layout="wide")
 
-# --- CSS ---
+# --- DISEÑO PREMIUM ---
+apply_premium_style()
+
+# CSS ADICIONAL (Específico de Dashboard)
 st.markdown("""
 <style>
-    :root {
-        --primary: #3B82F6;
-        --bg-main: #000000;
-        --bg-card: #111111;
-        --text-primary: #FFFFFF;
-        --border-color: #222222;
-    }
-
-    .stApp { background-color: var(--bg-main); color: var(--text-primary); }
-    
-    div[data-testid="stMetric"] { 
-        background-color: var(--bg-card) !important; 
-        padding: 15px; 
-        border-radius: 10px; 
-        border: 1px solid var(--border-color) !important; 
-    }
-    
     .status-active { color: #10B981; font-weight: 700; }
     .status-suspended { color: #EF4444; font-weight: 700; }
-
-    /* Tabs */
-    .stTabs [data-baseweb="tab"] {
-        color: #94A3B8;
-    }
-    .stTabs [aria-selected="true"] {
-        color: var(--primary) !important;
-        font-weight: bold;
-    }
-
-    /* Formulario */
-    div[data-testid="stForm"] {
-        background-color: var(--bg-card) !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: 15px !important;
-    }
-    
-    label {
-        color: var(--text-primary) !important;
-    }
-
-    /* Expander */
-    .stExpander {
-        background-color: var(--bg-card) !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: 10px !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -133,7 +93,7 @@ with tab1:
         # Map roles
         role_map = {1: "Cajero", 3: "Admin", 4: "Analista", 5: "Auditor"}
         df_staff['Rol'] = df_staff['role_id'].map(role_map)
-        st.dataframe(df_staff, use_container_width=True)
+        st.dataframe(df_staff, width="stretch")
     else:
         st.info("No hay personal registrado.")
 
@@ -204,18 +164,22 @@ with tab3:
                 with c3:
                     note = st.text_input("Nota (opcional)", key=f"note_{tx_id}")
                     col_b1, col_b2 = st.columns(2)
-                    if col_b1.button("✅ Aprobar", key=f"app_{tx_id}", use_container_width=True):
+                    st.markdown('<div class="btn-success">', unsafe_allow_html=True)
+                    if col_b1.button("✅ Aprobar", key=f"app_{tx_id}", width="stretch", type="primary"):
                         res = review_transaction(tx_id, st.session_state["user_data"]["Id_user"], True, note)
                         if res["success"]:
                             st.success("Aprobada")
                             st.rerun()
                         else: st.error(res["error"])
-                    if col_b2.button("❌ Rechazar", key=f"rej_{tx_id}", use_container_width=True):
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
+                    if col_b2.button("❌ Rechazar", key=f"rej_{tx_id}", width="stretch", type="secondary"):
                         res = review_transaction(tx_id, st.session_state["user_data"]["Id_user"], False, note)
                         if res["success"]:
                             st.warning("Rechazada")
                             st.rerun()
                         else: st.error(res["error"])
+                    st.markdown('</div>', unsafe_allow_html=True)
     else:
         st.info("No hay transacciones pendientes de revisión.")
 
@@ -223,6 +187,8 @@ with tab3:
 with tab4:
     st.header("Funciones Avanzadas")
     st.write("Configuraciones del sistema y registros de auditoría (Próximamente).")
-    if st.button("Cerrar Sesión Administrativa"):
+    st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
+    if st.button("Cerrar Sesión Administrativa", type="secondary"):
         st.session_state.clear()
         st.switch_page("pages/login_page.py")
+    st.markdown('</div>', unsafe_allow_html=True)
