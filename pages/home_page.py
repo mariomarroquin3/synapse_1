@@ -136,8 +136,9 @@ def logout():
 # --- VISTA DE BANCA EN LÍNEA ---
 head_col1, head_col2 = st.columns([3, 1])
 with head_col1:
-    st.markdown(f"## Bienvenido, {user['full_name']}")
-    st.caption(f"DUI: {user['DUI']} | Cuenta: {account['account_number']}")
+    st.markdown(f"## Bienvenido, {user.get('full_name', 'Usuario')}")
+    dui_display = user.get('DUI', user.get('dui', 'N/A'))
+    st.caption(f"DUI: {dui_display} | Cuenta: {account.get('account_number', 'N/A')}")
 with head_col2:
     if st.button("Cerrar Sesión"):
         logout()

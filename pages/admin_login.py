@@ -92,10 +92,12 @@ with st.form("admin_login_form"):
                         st.session_state["logged_in"] = True
                         st.session_state["is_admin"] = (user['role_id'] == 3)
                         st.session_state["user_data"] = {
-                            "Id_user": user['Id_user'], 
-                            "email": user['email'], 
-                            "full_name": user['full_name'],
-                            "role_id": user['role_id']
+                            "Id_user": user.get('Id_user'), 
+                            "email": user.get('email'), 
+                            "full_name": user.get('full_name'),
+                            "DUI": user.get('dui', user.get('DUI', 'N/A')),
+                            "phone_number": user.get('phone_number', 'N/A'),
+                            "role_id": user.get('role_id')
                         }
                         st.success(f"Bienvenido, {user['full_name']}")
                         time.sleep(1)

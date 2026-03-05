@@ -195,7 +195,7 @@ with tab_login:
                         "Id_user": user['Id_user'], 
                         "email": user['email'], 
                         "full_name": user['full_name'],
-                        "DUI": user['dui'], 
+                        "DUI": user.get('dui', user.get('DUI', 'N/A')), 
                         "phone_number": user['phone_number'],
                         "role_id": user['role_id']  # Agregado para Control de Roles
                     }
