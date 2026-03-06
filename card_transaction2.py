@@ -65,7 +65,7 @@ def ejecutar_simulacion():
 
         try:
             # Ejecución de la transacción
-            # Pasamos card_number (los 4 dígitos) y card_token para la validación
+
             resultado = create_simple_transaction(
                 account_id=t["account_id"],
                 amount=monto,
