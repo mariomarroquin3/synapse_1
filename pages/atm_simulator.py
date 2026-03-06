@@ -53,139 +53,169 @@ except Exception as e:
     st.error(f"Error técnico al procesar la cuenta: {e}")
     st.stop()
 
+# --- ESTILOS CSS ADICIONALES PARA ATM ---
+st.markdown("""
+    <style>
+    .atm-container {
+        background-color: #1e1e1e;
+        border-radius: 15px;
+        padding: 30px;
+        border: 2px solid #333;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .atm-screen {
+        background-color: #0c1c0c;
+        border: 5px solid #444;
+        border-radius: 10px;
+        padding: 20px;
+        font-family: 'Courier New', Courier, monospace;
+        color: #00ff00;
+        margin-bottom: 20px;
+        box-shadow: inset 0 0 10px #000;
+    }
+    .keypad-button {
+        height: 60px !important;
+        font-size: 20px !important;
+        font-weight: bold !important;
+    }
+    .amount-display {
+        font-size: 36px;
+        text-align: center;
+        background: #000;
+        color: #00ff00;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- VISTA DE CAJERO AUTOMÁTICO ---
-st.title("🏧 Cajero Automático")
-st.markdown("---")
+st.title("🏧 Synapse ATM 2.0")
 
-st.markdown(f"**Cliente:** {user['full_name']}")
-st.markdown(f"**Cuenta Destino:** {account['account_number']} ({account['currency']})")
+# --- INITIALIZE STATE ---
+if 'atm_amount' not in st.session_state:
+    st.session_state.atm_amount = ""
 
-tab_dep, tab_ret = st.tabs(["💰 Depositar", "💵 Retirar"])
+def add_digit(digit):
+    st.session_state.atm_amount += str(digit)
 
-with tab_dep:
-    st.markdown("### Seleccione o ingrese el monto a depositar")
+def clear_amount():
+    st.session_state.atm_amount = ""
+
+def set_quick_amount(val):
+    st.session_state.atm_amount = str(val)
+
+# --- ATM CONTAINER ---
+with st.container():
+    st.markdown(f"#### Bienvenido, {user['full_name']}")
     
-    # Variable para almacenar el monto a depositar si se usan botones rápidos
-    if 'quick_amount_dep' not in st.session_state:
-        st.session_state.quick_amount_dep = 0.0
+    col_main1, col_main2 = st.columns([1.5, 1])
+
+    with col_main1:
+        st.markdown('<div class="atm-screen">', unsafe_allow_html=True)
+        st.write("SYNAPSE BANKING NETWORK")
+        st.write(f"CUENTA: {account['account_number']}")
+        
+        balance = get_account_balance(account["Id_account"])
+        st.write(f"SALDO DISPONIBLE: $ {balance:,.2f} {account['currency']}")
+        
+        st.markdown("---")
+        
+        # Display current amount being entered
+        display_val = st.session_state.atm_amount if st.session_state.atm_amount else "0"
+        st.markdown(f'<div class="amount-display">$ {display_val}</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Action selection
+        operation = st.selectbox("Seleccione Operación", ["Retiro", "Depósito"], index=0)
+
+    with col_main2:
+        # Numeric Keypad
+        st.markdown("##### Teclado Numérico")
+        k_col1, k_col2, k_col3 = st.columns(3)
+        
+        for i in range(1, 10):
+            col = [k_col1, k_col2, k_col3][(i-1)%3]
+            if col.button(str(i), key=f"btn_{i}", use_container_width=True):
+                add_digit(i)
+                st.rerun()
+        
+        if k_col1.button(".", key="btn_dot", use_container_width=True):
+            if "." not in st.session_state.atm_amount:
+                add_digit(".")
+                st.rerun()
+        if k_col2.button("0", key="btn_0", use_container_width=True):
+            add_digit(0)
+            st.rerun()
+        if k_col3.button("C", key="btn_clear", use_container_width=True, type="secondary"):
+            clear_amount()
+            st.rerun()
+
+        st.markdown("##### Montos Rápidos")
+        q_col1, q_col2 = st.columns(2)
+        if q_col1.button("$20", key="q_20", use_container_width=True): set_quick_amount(20); st.rerun()
+        if q_col2.button("$50", key="q_50", use_container_width=True): set_quick_amount(50); st.rerun()
+        if q_col1.button("$100", key="q_100", use_container_width=True): set_quick_amount(100); st.rerun()
+        if q_col2.button("$500", key="q_500", use_container_width=True): set_quick_amount(500); st.rerun()
+
+    st.divider()
     
-    def set_amount_dep(val):
-        st.session_state.quick_amount_dep = val
-    
-    # Opciones rápidas
-    col1, col2, col3, col4 = st.columns(4)
-    col1.button("$20", key="dep_20", width="stretch", on_click=set_amount_dep, args=(20.0,), type="secondary")
-    col2.button("$50", key="dep_50", width="stretch", on_click=set_amount_dep, args=(50.0,), type="secondary")
-    col3.button("$100", key="dep_100", width="stretch", on_click=set_amount_dep, args=(100.0,), type="secondary")
-    col4.button("$500", key="dep_500", width="stretch", on_click=set_amount_dep, args=(500.0,), type="secondary")
-    
-    amount_to_deposit = st.number_input(
-        "Monto a depositar", 
-        min_value=0.0, 
-        value=st.session_state.quick_amount_dep, 
-        step=10.0, 
-        format="%.2f",
-        help="Ingrese el monto exacto que desea depositar en su cuenta.",
-        key="amount_deposit"
-    )
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
+    # Process Button
+    btn_label = "Confirmar Retiro" if operation == "Retiro" else "Confirmar Depósito"
     st.markdown('<div class="btn-success">', unsafe_allow_html=True)
-    if st.button("💰 Depositar Dinero", type="primary", width="stretch"):
-        if amount_to_deposit <= 0:
-            st.warning("El monto a depositar debe ser mayor a $0.00.")
-        else:
-            with st.spinner("Procesando los billetes ingresados..."):
-                time.sleep(1.5) # Simular procesamiento del cajero
-                
-                result = create_simple_transaction(
-                    account_id=account["Id_account"],
-                    amount=amount_to_deposit,
-                    entry_type=ENTRY_CREDIT,
-                    description=f"Depósito cajero automático ({account['currency']})",
-                    created_by_user_id=user["Id_user"],
-                    transaction_type_id=3, # 3 = depósito cajero automático
-                    status_id=1            # Se asume 1=Completada según los servicios
-                )
-                
-                if result.get("success"):
-                    if result.get("requires_approval"):
-                        st.info(f"⏳ Depósito de ${amount_to_deposit:,.2f} retenido para aprobación administrativa.")
-                        st.warning("El dinero no se reflejará hasta que un administrador lo apruebe.")
+    if st.button(btn_label, type="primary", use_container_width=True):
+        try:
+            final_amount = float(st.session_state.atm_amount) if st.session_state.atm_amount else 0.0
+            
+            if final_amount <= 0:
+                st.warning("Ingrese un monto válido mayor a $0.00")
+            else:
+                with st.spinner("Procesando transacción..."):
+                    time.sleep(2)
+                    
+                    entry_type = ENTRY_DEBIT if operation == "Retiro" else ENTRY_CREDIT
+                    type_id = 2 if operation == "Retiro" else 3
+                    desc = f"{operation} ATM - {account['account_number']}"
+                    
+                    if operation == "Retiro" and balance < final_amount:
+                        st.error("❌ Fondos insuficientes para este retiro.")
                     else:
-                        st.success(f"¡Depósito de ${amount_to_deposit:,.2f} procesado exitosamente!")
-                        st.balloons()
-                    st.session_state.quick_amount_dep = 0.0 # Reiniciar monto
-                else:
-                    st.error(f"Error al procesar el depósito: {result.get('error')}")
+                        result = create_simple_transaction(
+                            account_id=account["Id_account"],
+                            amount=final_amount,
+                            entry_type=entry_type,
+                            description=desc,
+                            created_by_user_id=user["Id_user"],
+                            transaction_type_id=type_id
+                        )
+                        
+                        if result.get("success"):
+                            st.success(f"✅ {operation} de ${final_amount:,.2f} procesado con éxito.")
+                            st.balloons()
+                            
+                            # Mostrar "Recibo"
+                            with st.expander("📄 Ver Recibo de Transacción", expanded=True):
+                                st.markdown(f"""
+                                    **SYNAPSE ATM RECEIPT**
+                                    - **Fecha:** {time.strftime("%Y-%m-%d %H:%M:%S")}
+                                    - **Operación:** {operation}
+                                    - **Monto:** ${final_amount:,.2f}
+                                    - **Estado:** {'PENDIENTE DE APROBACIÓN' if result.get('requires_approval') else 'EXITOSO'}
+                                    - **Referencia:** {result.get('transaction_id')}
+                                """)
+                            
+                            clear_amount()
+                            time.sleep(3)
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {result.get('error')}")
+        except ValueError:
+            st.error("Monto inválido. Por favor use el teclado numérico.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-with tab_ret:
-    st.markdown("### Seleccione o ingrese el monto a retirar")
-    
-    # Variable para almacenar el monto a retirar si se usan botones rápidos
-    if 'quick_amount_ret' not in st.session_state:
-        st.session_state.quick_amount_ret = 0.0
-    
-    def set_amount_ret(val):
-        st.session_state.quick_amount_ret = val
-    
-    # Opciones rápidas
-    col1, col2, col3, col4 = st.columns(4)
-    col1.button("$20", key="ret_20", width="stretch", on_click=set_amount_ret, args=(20.0,), type="secondary")
-    col2.button("$50", key="ret_50", width="stretch", on_click=set_amount_ret, args=(50.0,), type="secondary")
-    col3.button("$100", key="ret_100", width="stretch", on_click=set_amount_ret, args=(100.0,), type="secondary")
-    col4.button("$500", key="ret_500", width="stretch", on_click=set_amount_ret, args=(500.0,), type="secondary")
-    
-    amount_to_withdraw = st.number_input(
-        "Monto a retirar", 
-        min_value=0.0, 
-        value=st.session_state.quick_amount_ret, 
-        step=10.0, 
-        format="%.2f",
-        help="Ingrese el monto exacto que desea retirar de su cuenta.",
-        key="amount_withdraw"
-    )
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    if st.button("💵 Retirar Dinero", type="primary", width="stretch"):
-        if amount_to_withdraw <= 0:
-            st.warning("El monto a retirar debe ser mayor a $0.00.")
-        else:
-            with st.spinner("Procesando retiro..."):
-                time.sleep(1.5) # Simular procesamiento del cajero
-                
-                balance = get_account_balance(account["Id_account"])
-                if balance < amount_to_withdraw:
-                    st.error("Fondos insuficientes.")
-                else:
-                    result = create_simple_transaction(
-                        account_id=account["Id_account"],
-                        amount=amount_to_withdraw,
-                        entry_type=ENTRY_DEBIT,
-                        description=f"Retiro cajero automático ({account['currency']})",
-                        created_by_user_id=user["Id_user"],
-                        transaction_type_id=2, # 2 = retiro cajero automático
-                        status_id=1            # Se asume 1=Completada según los servicios
-                    )
-                    
-                    st.markdown('<div class="btn-success">', unsafe_allow_html=True)
-                    if result.get("success"):
-                        if result.get("requires_approval"):
-                            st.info(f"⏳ Retiro de ${amount_to_withdraw:,.2f} retenido para aprobación administrativa.")
-                            st.warning("La transacción será procesada una vez sea aprobada por un administrador.")
-                        else:
-                            st.success(f"¡Retiro de ${amount_to_withdraw:,.2f} procesado exitosamente!")
-                            st.balloons()
-                        st.session_state.quick_amount_ret = 0.0 # Reiniciar monto
-                    else:
-                        st.error(f"Error al procesar el retiro: {result.get('error')}")
-                    st.markdown('</div>', unsafe_allow_html=True)
-
 st.markdown("---")
-if st.button("⬅️ Volver a Inicio", width="stretch", type="secondary"):
-    st.session_state.quick_amount_dep = 0.0 # Reiniciar al salir
-    st.session_state.quick_amount_ret = 0.0 # Reiniciar al salir
+if st.button("⬅️ Volver a Inicio", use_container_width=True, type="secondary"):
+    clear_amount()
     st.switch_page("pages/home_page.py")
