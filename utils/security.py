@@ -31,10 +31,18 @@ def verify_password(password: str, stored_hash: str) -> bool:
         print("[DEBUG] Password o hash vacío.")
         return False
 
+    # Strip whitespace from stored_hash (common issue with Access database)
+    stored_hash = stored_hash.strip()
+    
     password_bytes = password.encode("utf-8")
     stored_hash_bytes = stored_hash.encode("utf-8")
 
-    result = bcrypt.checkpw(password_bytes, stored_hash_bytes)
+    try:
+        result = bcrypt.checkpw(password_bytes, stored_hash_bytes)
+    except ValueError as e:
+        print(f"[DEBUG] Error verificando hash: {e}")
+        print(f"[DEBUG] Hash recibido: {stored_hash[:20]}...")
+        return False
 
     print(f"[DEBUG] Resultado verificación: {result}")
 
