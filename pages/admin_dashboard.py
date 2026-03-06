@@ -37,7 +37,7 @@ st.markdown("""
 
 # --- CÁLCULO DE MÉTRICAS (KPIs) ---
 with get_cursor() as cursor:
-    cursor.execute("SELECT COUNT(*) FROM [user] WHERE role_id = 1")
+    cursor.execute("SELECT COUNT(*) FROM [user] WHERE role_id = 2")
     total_clients = cursor.fetchone()[0]
     
     cursor.execute("SELECT COUNT(*) FROM [transaction] WHERE status_id = 2")
