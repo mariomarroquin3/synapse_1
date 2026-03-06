@@ -1,7 +1,7 @@
 from models.card_model import get_card_with_user
 from card_print.generate_card_pdf import generate_card_pdf
 
-account_id = 218  # Cambia por la cuenta que quieras probar
+account_id = 219  # Cambia por la cuenta que quieras probar
 
 card = get_card_with_user(account_id)
 

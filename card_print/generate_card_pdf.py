@@ -4,8 +4,17 @@ from reportlab.lib.utils import ImageReader
 from reportlab.lib import colors
 
 
+from datetime import datetime
+
 def generate_card_pdf(card_data, id_account):
-    _, last4, expiration_date, full_name = card_data
+    # Manejar el caso si card_data es un diccionario (del modelo) o una tupla
+    if isinstance(card_data, dict):
+        last4 = card_data.get('card_number_last4', '0000')
+        expiration_date = card_data.get('expiration_date')
+        full_name = card_data.get('full_name', 'TITULAR')
+    else:
+        # Por compatibilidad con versiones anteriores que usaban tuplas
+        _, last4, expiration_date, full_name = card_data
 
     image_path = "plantilla_tarjeta.png"
     image = ImageReader(image_path)
@@ -51,7 +60,22 @@ def generate_card_pdf(card_data, id_account):
     pos_y_fecha = img_height * 0.20
 
     if expiration_date:
-        texto_expiracion = f"VENCE: {expiration_date.strftime('%m/%y')}"
+        # Si ya es un objeto datetime
+        if hasattr(expiration_date, 'strftime'):
+            texto_expiracion = f"VENCE: {expiration_date.strftime('%m/%y')}"
+        # Si es un string (que a veces devuelve Access)
+        else:
+            try:
+                # Intentar parsear si viene como string
+                if isinstance(expiration_date, str):
+                    # Formato típico de Access o string simple
+                    dt = datetime.strptime(expiration_date.split()[0], '%Y-%m-%d')
+                    texto_expiracion = f"VENCE: {dt.strftime('%m/%y')}"
+                else:
+                    texto_expiracion = f"VENCE: {str(expiration_date)}"
+            except:
+                texto_expiracion = f"VENCE: {str(expiration_date)}"
+        
         c.drawString(pos_x_fecha, pos_y_fecha, texto_expiracion)
 
     c.save()

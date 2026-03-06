@@ -2,3 +2,4 @@ streamlit
 pyodbc
 python-dotenv
 bcrypt
+reportlab
