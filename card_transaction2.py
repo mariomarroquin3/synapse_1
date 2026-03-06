@@ -74,7 +74,7 @@ def ejecutar_simulacion():
                 created_by_user_id=t["user_id"], # user_id real del dueño
                 transaction_type_id=TIPO_TX_PAGO,
                 card_number=t["last4"],          # Usamos last4 para buscar
-                card_token=t["token"]            # Usamos token para validar
+                pin=t["token"]            # Usamos token para validar
             )
 
             if resultado.get("success"):

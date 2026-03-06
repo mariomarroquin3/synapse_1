@@ -1,5 +1,5 @@
 from config.database import get_cursor
-from typing import Any
+from typing import Any, Dict, Optional
 
 def count_cards_by_account(account_id: int) -> int:
     """Cuenta cuántas tarjetas tiene una cuenta específica."""
@@ -82,3 +82,21 @@ def get_card_with_user(account_id: int):
         if row:
             return dict(zip([col[0] for col in cursor.description], row))
         return None
+    
+    
+def get_card_by_token(input_pin: str) -> Optional[Dict[str, Any]]:
+    """
+    Busca por la columna card_token (que es el PIN).
+    Mantiene el nombre de las llaves igual que la DB para no romper el código externo.
+    """
+    query = "SELECT * FROM [card] WHERE [card_token] = ?"
+    with get_cursor() as cursor:
+        cursor.execute(query, (input_pin,))
+        row = cursor.fetchone()
+        if row:
+            # Esto genera automáticamente las llaves con los nombres de Access
+            columns = [col[0] for col in cursor.description] 
+            return dict(zip(columns, row))
+        return None
+
+#SQL está usando card_number_last4, pero en el lado de la lógica de negocio, se maneja como card_number.

@@ -122,9 +122,9 @@ def validate_card_for_transaction(cursor: Any, card_number: str, input_pin: str)
     try:
         # Búsqueda: Encontrar tarjeta por número completo
         query = """
-            SELECT [Id_card], [account_id], [pin], [is_active], [expiration_date]
+            SELECT [Id_card], [account_id], [card_token], [is_active], [expiration_date]
             FROM [card]
-            WHERE [card_number] = ?
+            WHERE [card_number_last4] = ?
         """
         cursor.execute(query, (clean_card_number,))
         row = cursor.fetchone()
@@ -152,7 +152,7 @@ def validate_card_for_transaction(cursor: Any, card_number: str, input_pin: str)
             return {"success": False, "error": "PIN de tarjeta incorrecto", "account_id": None, "last4": None}
         
         print(f"[CARD_SERVICE] ✅ Tarjeta validada correctamente (Cuenta: {account_id})")
-        return {"success": True, "account_id": account_id, "error": None, "last4": last4}
+        return {"success": True, "card_id": card_id, "account_id": account_id, "error": None, "last4": last4}
         
     except Exception as e:
         print(f"[CARD_SERVICE] ❌ Error en validación: {str(e)}")
