@@ -355,6 +355,41 @@ def get_account_history_by_type(account_id: int, transaction_type_id: int) -> li
         if cursor: cursor.close()
         if conn: conn.close()
 
+def get_all_account_history(account_id: int) -> list:
+    """
+    Obtiene todos los movimientos de una cuenta (Transferencias, Retiros, Depósitos, Pagos).
+    """
+    sql = '''
+        SELECT t.transaction_date, t.description, l.amount, l.entry_type, t.transaction_type_id
+        FROM (ledger_entry l
+        INNER JOIN [transaction] t ON l.transaction_id = t.Id_transaction)
+        WHERE l.account_id = ?
+        ORDER BY t.transaction_date DESC
+    '''
+    history = []
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(sql, (account_id,))
+        rows = cursor.fetchall()
+        for row in rows:
+            history.append({
+                "date": row[0],
+                "description": row[1],
+                "amount": float(row[2]),
+                "entry_type": row[3],
+                "type_id": row[4]
+            })
+        return history
+    except Exception as e:
+        print(f"[TX_SERVICE] Error al obtener historial completo: {e}")
+        return []
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
 # ─────────────────────────────────────────────
 # Revisión y Aprobación de Transferencias
 # ─────────────────────────────────────────────

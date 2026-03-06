@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # --- 2. IMPORTACIONES LOCALES ---
 from models.account_model import get_account_by_user, get_account_by_number
 from models.card_model import get_cards_by_account
-from services.transaction_service import get_account_balance, get_account_history_by_type, create_transfer
+from services.transaction_service import get_account_balance, get_all_account_history, create_transfer
 from services.card_service import update_card_active_status, create_card_for_account
 from utils.card_generator import generate_luhn_card_number
 from config.database import get_connection
@@ -75,7 +75,7 @@ with head_col2:
 st.divider()
 
 # Menú de Navegación
-menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Mis Tarjetas", "Historial Transferencias", "Retiros", "Depósitos", "Mi Perfil"])
+menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Mis Tarjetas", "Historial de Movimientos", "Mi Perfil"])
 
 # --- BOTÓN DE CAJERO ---
 st.sidebar.divider()
@@ -155,54 +155,55 @@ elif menu == "Transferencias":
                             else:
                                 st.error("No se pudo identificar el ID de la cuenta destino.")
 
-elif menu == "Historial Transferencias":
-    st.subheader("Historial de Transferencias")
+elif menu == "Historial de Movimientos":
+    st.subheader("Historial de Movimientos")
     if not account["Id_account"]:
         st.warning("No tienes una cuenta bancaria asociada para ver el historial.")
     else:
-        tx_history = get_account_history_by_type(account["Id_account"], 1) # 1 = Transferencia
-        if tx_history:
-            for tx in tx_history:
-                with st.container(border=True):
-                    st.markdown(f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}")
-                    st.markdown(f"**Descripción:** {tx['description']}")
-                    
-                    if tx['entry_type'] == 'debit':
-                        st.markdown(f"**Monto:** <span style='color:red;'>-$ {tx['amount']:,.2f}</span> (Enviado)", unsafe_allow_html=True)
-                    else:
-                        st.markdown(f"**Monto:** <span style='color:green;'>+$ {tx['amount']:,.2f}</span> (Recibido)", unsafe_allow_html=True)
-        else:
-            st.info("No tienes transferencias registradas todavía.")
+        all_history = get_all_account_history(account["Id_account"])
+        if all_history:
+            # Diccionario para nombres amigables de tipos
+            type_names = {1: "Transferencia", 2: "Retiro", 3: "Depósito", 4: "Pago con Tarjeta"}
+            
+            # Crear pestañas para separar movimientos
+            tab_todo, tab_trans, tab_retiro, tab_depo, tab_pago = st.tabs([
+                "Todos", "Transferencias", "Retiros", "Depósitos", "Pagos"
+            ])
 
-elif menu == "Retiros":
-    st.subheader("Historial de Retiros")
-    if account["Id_account"]:
-        history = get_account_history_by_type(account["Id_account"], 2) # 2 = retiro
-        if history:
-            for tx in history:
-                with st.container(border=True):
-                    st.markdown(f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}")
-                    st.markdown(f"**Descripción:** {tx['description']}")
-                    st.markdown(f"**Monto:** <span style='color:red;'>-$ {tx['amount']:,.2f}</span>", unsafe_allow_html=True)
-        else:
-            st.info("No tienes retiros registrados todavía.")
-    else:
-        st.warning("No tienes una cuenta bancaria asociada.")
+            def render_transactions(tx_list):
+                if not tx_list:
+                    st.info("No hay movimientos en esta categoría.")
+                    return
+                for tx in tx_list:
+                    with st.container(border=True):
+                        col_tx1, col_tx2 = st.columns([3, 1])
+                        with col_tx1:
+                            st.markdown(f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}")
+                            st.markdown(f"**Tipo:** {type_names.get(tx['type_id'], 'Otro')}")
+                            st.markdown(f"**Descripción:** {tx['description']}")
+                        
+                        with col_tx2:
+                            if tx['entry_type'] == 'debit':
+                                st.markdown(f"### <span style='color:#EF4444;'>-$ {tx['amount']:,.2f}</span>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"### <span style='color:#10B981;'>+$ {tx['amount']:,.2f}</span>", unsafe_allow_html=True)
 
-elif menu == "Depósitos":
-    st.subheader("Historial de Depósitos")
-    if account["Id_account"]:
-        history = get_account_history_by_type(account["Id_account"], 3) # 3 = depósito
-        if history:
-            for tx in history:
-                with st.container(border=True):
-                    st.markdown(f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}")
-                    st.markdown(f"**Descripción:** {tx['description']}")
-                    st.markdown(f"**Monto:** <span style='color:green;'>+$ {tx['amount']:,.2f}</span>", unsafe_allow_html=True)
+            with tab_todo:
+                render_transactions(all_history)
+            
+            with tab_trans:
+                render_transactions([tx for tx in all_history if tx['type_id'] == 1])
+            
+            with tab_retiro:
+                render_transactions([tx for tx in all_history if tx['type_id'] == 2])
+            
+            with tab_depo:
+                render_transactions([tx for tx in all_history if tx['type_id'] == 3])
+
+            with tab_pago:
+                render_transactions([tx for tx in all_history if tx['type_id'] == 4])
         else:
-            st.info("No tienes depósitos registrados todavía.")
-    else:
-        st.warning("No tienes una cuenta bancaria asociada.")
+            st.info("No tienes movimientos registrados todavía.")
 
 elif menu == "Mis Tarjetas":
     st.subheader("Gestión de Tarjetas")
