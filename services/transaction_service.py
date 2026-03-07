@@ -346,12 +346,12 @@ def process_card_payment(card_number: str, pin: str, amount: float, description:
         conn = get_connection()
         cursor = conn.cursor()
         
-        # 1. Validar Credenciales: Exact match en DB
-        # card_number_last4 es la columna que almacena el PIN en este esquema.
+        # 1. Validar Credenciales: Exact match y propidad con cuenta
         sql_validate = """
-            SELECT Id_card, account_id, is_active 
-            FROM [card] 
-            WHERE card_number = ? AND card_number_last4 = ?
+            SELECT c.Id_card, a.Id_account, c.is_active, a.status_id, a.user_id
+            FROM [card] c
+            INNER JOIN [account] a ON c.account_id = a.Id_account
+            WHERE c.card_number = ? AND c.card_number_last4 = ?
         """
         cursor.execute(sql_validate, (card_number, pin))
         card_row = cursor.fetchone()
@@ -359,12 +359,18 @@ def process_card_payment(card_number: str, pin: str, amount: float, description:
         if not card_row:
             return {"success": False, "error": "Credenciales inválidas."}
             
-        card_id, account_id, is_active = card_row
+        card_id, account_id, is_active, status_id, user_id = card_row
         
-        if not is_active:
-            return {"success": False, "error": "La tarjeta se encuentra inactiva o bloqueada."}
+        # Validar Candado 1: Propiedad de la Tarjeta
+        if user_id != created_by_user_id:
+            return {"success": False, "error": "Error: La tarjeta no pertenece a su perfil."}
+        
+        # Validar Candado 2: Estados conjuntos
+        if not is_active or status_id != 1:
+            return {"success": False, "error": "Error: Cuenta o tarjeta inactiva."}
             
-        # 2. Verificar estado de la cuenta origen
+        # El status acc_status ya no tiene que hacer otra query porque lo acabamos de traer
+        # pero es bueno re-revisarlo por _check_account_active para ser consistente
         acc_status = _check_account_active(account_id, is_debit=True)
         if not acc_status["success"]:
             return acc_status

@@ -10,6 +10,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
 from models.user_model import get_users_by_role_category, update_user_status
+from models.account_model import get_account_by_user, update_account_status
+from models.card_model import get_cards_by_account, update_card_status
 from services.user_service import register_user_with_permissions
 from services.transaction_service import review_transaction
 from config.database import get_cursor
@@ -72,9 +74,10 @@ if role_id == 3:
     st.divider()
 
 if role_id == 3:
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "👥 Gestión de Personal", 
         "💳 Gestión de Clientes", 
+        "🔒 Control de Cuentas y Tarjetas",
         "💸 Aprobaciones", 
         "📜 Historial de Aprobaciones",
         "⚙️ Configuración"
@@ -187,8 +190,95 @@ if role_id == 3:
         else:
             st.info("No hay clientes registrados en el sistema.")
 
-    # --- TAB 3: APROBACIONES ($10K+) ---
+    # --- TAB 3: CONTROL DE CUENTAS Y TARJETAS ---
     with tab3:
+        st.header("Control de Cuentas y Tarjetas de Clientes")
+        st.write("Gestiona el estado operativo (Activa, Bloqueada, Suspendida) de las cuentas y tarjetas.")
+
+        # Obtener todos los clientes
+        clients_for_control = get_users_by_role_category(is_staff=False)
+        
+        if clients_for_control:
+            search_control = st.text_input("🔍 Buscar cliente por nombre o correo", key="search_ctrl").lower()
+            if search_control:
+                clients_for_control = [c for c in clients_for_control if search_control in c['full_name'].lower() or search_control in c['email'].lower()]
+            
+            for client in clients_for_control:
+                with st.expander(f"👤 {client['full_name']} | ✉️ {client['email']}"):
+                    # 1. Obtener y renderizar la Cuenta
+                    account = get_account_by_user(client["Id_user"])
+                    st.markdown("#### 🏦 Cuenta Bancaria")
+                    if account:
+                        ac_id = account["Id_account"]
+                        ac_num = account["account_number"]
+                        ac_status = account["status_id"]
+                        
+                        col_acc1, col_acc2 = st.columns([2, 1])
+                        with col_acc1:
+                            st.write(f"**Número de Cuenta:** `{ac_num}`")
+                            st.write(f"**Saldo Actual:** Pendiente a cargar en módulo") # Podriamos cargar el get_balance_from_ledger pero evitamos llamadas excesivas en un loop
+                        
+                        with col_acc2:
+                            new_ac_status = st.selectbox(
+                                "Estado de la Cuenta",
+                                options=[1, 2, 3],
+                                format_func=lambda x: "✅ Activa" if x == 1 else ("⚠️ Bloqueada" if x == 2 else "🚫 Suspendida"),
+                                index=[1, 2, 3].index(ac_status),
+                                key=f"acc_status_{ac_id}"
+                            )
+                            
+                            if new_ac_status != ac_status:
+                                try:
+                                    update_account_status(ac_id, new_ac_status)
+                                    st.success(f"Estado de cuenta actualizado correctamente.")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Error: {str(e)}")
+                    else:
+                        st.info("Este cliente aún no tiene una cuenta bancaria.")
+                        
+                    st.divider()
+                    
+                    # 2. Obtener y renderizar las Tarjetas
+                    st.markdown("#### 💳 Tarjetas Vinculadas")
+                    if account:
+                        cards = get_cards_by_account(account["Id_account"])
+                        if cards:
+                            for card in cards:
+                                with st.container(border=True):
+                                    c1, c2 = st.columns([3, 1])
+                                    with c1:
+                                        # Mostrar últimos 4 dígitos reales del card_number de 16, no la de PIN
+                                        last4 = str(card["card_number"])[-4:]
+                                        st.write(f"**Tarjeta:** `**** **** **** {last4}`")
+                                        exp = card["expiration_date"].strftime("%m/%y") if card["expiration_date"] else "N/A"
+                                        st.caption(f"Vence: {exp}")
+                                    
+                                    with c2:
+                                        # Status Toggle
+                                        toggle_label = "Activa" if card["is_active"] else "Inactiva"
+                                        is_active_new = st.toggle(
+                                            toggle_label,
+                                            value=bool(card["is_active"]),
+                                            key=f"card_toggle_{card['Id_card']}"
+                                        )
+                                        
+                                        if is_active_new != bool(card["is_active"]):
+                                            try:
+                                                update_card_status(card["Id_card"], is_active_new)
+                                                st.toast(f"Estado de la tarjeta ...{last4} cambiado a {'Activa' if is_active_new else 'Inactiva'}", icon="✅")
+                                                time.sleep(1)
+                                                st.rerun()
+                                            except Exception as e:
+                                                st.error(f"Error: {str(e)}")
+                        else:
+                            st.info("No hay tarjetas vinculadas a esta cuenta.")
+        else:
+            st.info("No hay clientes registrados en el sistema.")
+
+    # --- TAB 4: APROBACIONES ($10K+) ---
+    with tab4:
         st.header("Transacciones Pendientes de Aprobación")
         st.write("Cualquier movimiento mayor o igual a $10,000 requiere autorización manual.")
 
@@ -246,8 +336,8 @@ if role_id == 3:
         else:
             st.info("No hay transacciones pendientes de revisión.")
 
-    # --- TAB 4: HISTORIAL DE APROBACIONES ---
-    with tab4:
+    # --- TAB 5: HISTORIAL DE APROBACIONES ---
+    with tab5:
         st.header("Historial de Revisiones")
         st.write("Registro de transacciones que ya han sido procesadas por el equipo administrativo.")
 
@@ -295,8 +385,8 @@ if role_id == 3:
         else:
             st.info("No hay historial de revisiones disponible.")
 
-    # --- TAB 5: CONFIGURACIÓN ---
-    with tab5:
+    # --- TAB 6: CONFIGURACIÓN ---
+    with tab6:
         st.subheader("Estado del Sistema")
         st.success("Sistemas operativos: DB Conectada | Motor de Transacciones Activo")
         st.write("Configuraciones avanzadas y registros de auditoría (Próximamente).")

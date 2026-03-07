@@ -284,3 +284,27 @@ def create_account(user_id: int, currency: str) -> int:
             raise Exception("Could not retrieve account ID")
         
         return int(result[0])
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ACCOUNT STATE MANAGEMENT
+# ═══════════════════════════════════════════════════════════════════════════
+
+def update_account_status(account_id: int, new_status_id: int) -> bool:
+    """
+    Updates the status of an account.
+    Returns True if successful, raises Exception if an error occurs.
+    
+    1: Active
+    2: Blocked
+    3: Suspended
+    """
+    if new_status_id not in (1, 2, 3):
+        raise ValueError("Invalid status ID. Must be 1, 2, or 3.")
+        
+    query = "UPDATE [account] SET status_id = ? WHERE Id_account = ?"
+    with get_cursor(commit=True) as cursor:
+        try:
+            cursor.execute(query, (new_status_id, account_id))
+            return True
+        except Exception as e:
+            raise Exception(f"Error updating account status: {e}")

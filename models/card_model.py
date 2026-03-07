@@ -99,4 +99,18 @@ def get_card_by_pin(input_pin: str) -> Optional[Dict[str, Any]]:
             return dict(zip(columns, row))
         return None
 
+def update_card_status(card_id: int, is_active: bool) -> bool:
+    """
+    Actualiza el estado booleano de la tarjeta.
+    """
+    query = "UPDATE [card] SET [is_active] = ? WHERE [Id_card] = ?"
+    with get_cursor(commit=True) as cursor:
+        try:
+            # En Access True/False se suele traducir en 1/0 o True/False nativo.
+            # pyodbc suele encargarse del boolean tipo True/False.
+            cursor.execute(query, (is_active, card_id))
+            return True
+        except Exception as e:
+            raise Exception(f"Error actualizando estado de tarjeta: {str(e)}")
+
 #SQL está usando card_number_last4, pero en el lado de la lógica de negocio, se maneja como card_number.
