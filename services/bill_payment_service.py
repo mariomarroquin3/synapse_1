@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Dict
-from models.card_model import get_card_by_token
+from models.card_model import get_card_by_pin
 from services.transaction_service import create_simple_transaction, ENTRY_DEBIT
 
 # Definimos tu nuevo tipo de transacción
@@ -11,16 +11,16 @@ IDX_CARD_ACCOUNT_ID = 1
 IDX_CARD_EXP_DATE = 6  # Cambiado de 5 a 6 (el 5 es holder_name)
 
 def pay_bill_with_card(
-    card_token: str, 
+    pin: str, 
     amount: float, 
     bill_description: str, 
     user_id: int
 ) -> Dict[str, Any]: # <-- Esto elimina el aviso de "Unknown"
     """
-    Procesa el pago de un servicio usando el token de la tarjeta.
+    Procesa el pago de un servicio usando el PIN de la tarjeta.
     """
     # 1. Buscar la tarjeta
-    card = get_card_by_token(card_token)
+    card = get_card_by_pin(pin)
     if not card:
         return {"success": False, "error": "Tarjeta no encontrada o token inválido."}
 

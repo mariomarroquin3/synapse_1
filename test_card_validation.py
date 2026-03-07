@@ -20,7 +20,7 @@ def demo_card_validation():
     """
     
     print("\n" + "="*70)
-    print("🧪 PRUEBA DE VALIDACIÓN DE TARJETAS - SYNAPSE BANKING SYSTEM")
+    print("TEST PRUEBA DE VALIDACION DE TARJETAS - SYNAPSE BANKING SYSTEM")
     print("="*70)
     
     # ──────────────────────────────────────────────────────────────
@@ -37,24 +37,23 @@ def demo_card_validation():
         
         # Buscar una tarjeta válida en la base de datos
         cursor.execute("""
-            SELECT [card_number], [card_token], [is_active], [expiration_date]
+            SELECT TOP 1 [card_number], [card_number_last4], [is_active], [expiration_date]
             FROM [card]
             WHERE [is_active] = True
             AND [expiration_date] > ?
-            LIMIT 1
         """, (datetime.now(),))
         
         row = cursor.fetchone()
         
         if row:
             card_num, card_tok, is_active, exp_date = row
-            print(f"✓ Tarjeta encontrada: {card_num[-4:]}****")
+            print(f"OK Tarjeta encontrada: {card_num[-4:]}****")
             print(f"  - Activa: {is_active}")
             print(f"  - Vence el: {exp_date}")
             
             # Validar usando el cursor compartido
             result = validate_card_for_transaction(cursor, card_num, card_tok)
-            print(f"  - Validación: {'✅ EXITOSA' if result['success'] else '❌ FALLIDA'}")
+            print(f"  - Validacion: {'OK EXITOSA' if result['success'] else 'FAIL FALLIDA'}")
             if result['success']:
                 print(f"  - Cuenta asociada: {result['account_id']}")
             else:
@@ -82,18 +81,17 @@ def demo_card_validation():
         
         # Buscar una tarjeta bloqueada
         cursor.execute("""
-            SELECT [card_number], [card_token], [is_active]
+            SELECT TOP 1 [card_number], [card_number_last4], [is_active]
             FROM [card]
             WHERE [is_active] = False
-            LIMIT 1
         """)
         
         row = cursor.fetchone()
         
         if row:
             card_num, card_tok, is_active = row
-            print(f"✓ Tarjeta bloqueada encontrada: {card_num[-4:]}****")
-            print(f"  - Estado: {'Inactiva ❌' if not is_active else 'Activa ✓'}")
+            print(f"OK Tarjeta bloqueada encontrada: {card_num[-4:]}****")
+            print(f"  - Estado: {'Inactiva FAIL' if not is_active else 'Activa OK'}")
             
             # Intentar validar (debería fallar)
             result = validate_card_for_transaction(cursor, card_num, card_tok)
@@ -101,10 +99,10 @@ def demo_card_validation():
             if not result['success']:
                 print(f"  - Error esperado: {result['error']}")
         else:
-            print("⚠️ No se encontraron tarjetas bloqueadas en la BD para prueba")
+            print("WARN No se encontraron tarjetas bloqueadas en la BD para prueba")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"ERROR: {e}")
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
@@ -123,17 +121,16 @@ def demo_card_validation():
         
         # Buscar una tarjeta vencida
         cursor.execute("""
-            SELECT [card_number], [card_token], [is_active], [expiration_date]
+            SELECT TOP 1 [card_number], [card_number_last4], [is_active], [expiration_date]
             FROM [card]
             WHERE [expiration_date] < ?
-            LIMIT 1
         """, (datetime.now(),))
         
         row = cursor.fetchone()
         
         if row:
             card_num, card_tok, is_active, exp_date = row
-            print(f"✓ Tarjeta expirada encontrada: {card_num[-4:]}****")
+            print(f"OK Tarjeta expirada encontrada: {card_num[-4:]}****")
             print(f"  - Fecha de vencimiento: {exp_date}")
             print(f"  - Fecha actual: {datetime.now()}")
             
@@ -143,10 +140,10 @@ def demo_card_validation():
             if not result['success']:
                 print(f"  - Error esperado: {result['error']}")
         else:
-            print("⚠️ No se encontraron tarjetas vencidas en la BD para prueba")
+            print("WARN No se encontraron tarjetas vencidas en la BD para prueba")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"ERROR: {e}")
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
@@ -165,18 +162,17 @@ def demo_card_validation():
         
         # Buscar una tarjeta válida
         cursor.execute("""
-            SELECT [card_number], [card_token], [is_active], [expiration_date]
+            SELECT TOP 1 [card_number], [card_number_last4], [is_active], [expiration_date]
             FROM [card]
             WHERE [is_active] = True
             AND [expiration_date] > ?
-            LIMIT 1
         """, (datetime.now(),))
         
         row = cursor.fetchone()
         
         if row:
             card_num, card_tok, is_active, exp_date = row
-            print(f"✓ Tarjeta válida encontrada: {card_num[-4:]}****")
+            print(f"OK Tarjeta valida encontrada: {card_num[-4:]}****")
             
             # Intentar validar con token INCORRECTO
             invalid_token = "tok_invalid_token_xyz"
@@ -184,14 +180,14 @@ def demo_card_validation():
             print(f"  - Token proporcionado: {invalid_token}")
             
             result = validate_card_for_transaction(cursor, card_num, invalid_token)
-            print(f"  - Validación: {'✅ EXITOSA' if result['success'] else '❌ FALLIDA (ESPERADO)'}")
+            print(f"  - Validacion: {'OK EXITOSA' if result['success'] else 'OK FALLIDA (ESPERADO)'}")
             if not result['success']:
                 print(f"  - Error esperado: {result['error']}")
         else:
-            print("⚠️ No se encontraron tarjetas válidas en la BD para prueba")
+            print("WARN No se encontraron tarjetas validas en la BD para prueba")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"ERROR: {e}")
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
@@ -210,41 +206,40 @@ def demo_card_validation():
         
         # Obtener ID de una tarjeta activa
         cursor.execute("""
-            SELECT [Id_card], [card_number], [is_active]
+            SELECT TOP 1 [Id_card], [card_number], [is_active]
             FROM [card]
             WHERE [is_active] = True
-            LIMIT 1
         """)
         
         row = cursor.fetchone()
         
         if row:
             card_id, card_num, curr_status = row
-            print(f"✓ Tarjeta seleccionada: {card_num[-4:]}**** (ID: {card_id})")
-            print(f"  - Estado actual: {'Activa ✓' if curr_status else 'Bloqueada ❌'}")
+            print(f"OK Tarjeta seleccionada: {card_num[-4:]}**** (ID: {card_id})")
+            print(f"  - Estado actual: {'Activa OK' if curr_status else 'Bloqueada FAIL'}")
             
             try:
                 # BLOQUEAR la tarjeta
-                print(f"\n  → Ejecutando: update_card_active_status(cursor, {card_id}, False)")
+                print(f"\n  -> Ejecutando: update_card_active_status(cursor, {card_id}, False)")
                 update_card_active_status(cursor, card_id, False)
                 conn.commit()
-                print(f"  ✅ Tarjeta bloqueada exitosamente")
+                print(f"  OK Tarjeta bloqueada exitosamente")
                 
                 # DESBLOQUEAR la tarjeta
-                print(f"\n  → Ejecutando: update_card_active_status(cursor, {card_id}, True)")
+                print(f"\n  -> Ejecutando: update_card_active_status(cursor, {card_id}, True)")
                 cursor = conn.cursor()  # New cursor after commit
                 update_card_active_status(cursor, card_id, True)
                 conn.commit()
-                print(f"  ✅ Tarjeta desbloqueada exitosamente")
+                print(f"  OK Tarjeta desbloqueada exitosamente")
                 
             except Exception as e:
                 conn.rollback()
-                print(f"  ❌ Error durante la actualización: {e}")
+                print(f"  ERROR durante la actualizacion: {e}")
         else:
-            print("⚠️ No se encontraron tarjetas activas para la prueba")
+            print("WARN No se encontraron tarjetas activas para la prueba")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"ERROR: {e}")
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
@@ -268,17 +263,16 @@ def demo_card_validation():
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT [card_number], [card_token], [account_id]
+                SELECT TOP 1 [card_number], [card_number_last4], [account_id]
                 FROM [card]
                 WHERE [is_active] = True
                 AND [expiration_date] > ?
-                LIMIT 1
             """, (datetime.now(),))
             
             row = cursor.fetchone()
             if row:
                 card_num, card_tok, account_id = row
-                print(f"✓ Datos de prueba obtenidos:")
+                print(f"OK Datos de prueba obtenidos:")
                 print(f"  - Tarjeta: {card_num[-4:]}****")
                 print(f"  - Cuenta: {account_id}")
         finally:
@@ -287,30 +281,30 @@ def demo_card_validation():
         
         if card_num and account_id:
             # Intentar realizar transacción CON validación de tarjeta
-            print(f"\n→ Ejecutando: create_simple_transaction() CON card_number y card_token")
+            print(f"\n-> Ejecutando: create_simple_transaction() CON card_number y pin")
             result = create_simple_transaction(
                 account_id=account_id,
                 amount=10.00,
                 entry_type=ENTRY_DEBIT,
-                description="Pago con validación de tarjeta - TEST",
+                description="Pago con validacion de tarjeta - TEST",
                 created_by_user_id=1,
                 transaction_type_id=4,  # Bill Payment
                 card_number=card_num,
-                card_token=card_tok
+                pin=card_tok
             )
             
             if result['success']:
-                print(f"\n✅ TRANSACCIÓN EXITOSA")
+                print(f"\nOK TRANSACCION EXITOSA")
                 print(f"  - ID Transacción: {result['transaction_id']}")
                 print(f"  - ID Ledger: {result['ledger_entry_id']}")
             else:
-                print(f"\n❌ TRANSACCIÓN FALLIDA")
+                print(f"\nERROR TRANSACCION FALLIDA")
                 print(f"  - Error: {result['error']}")
         else:
-            print("⚠️ No se pudieron obtener datos de prueba de la BD")
+            print("WARN No se pudieron obtener datos de prueba de la BD")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"ERROR: {e}")
     
     # ──────────────────────────────────────────────────────────────
     # Test 7: Transacción SIN Validación de Tarjeta (Backward Compatibility)
@@ -328,7 +322,7 @@ def demo_card_validation():
             conn = get_connection()
             cursor = conn.cursor()
             
-            cursor.execute("SELECT [Id_account] FROM [account] WHERE [status_id] = 1 LIMIT 1")
+            cursor.execute("SELECT TOP 1 [Id_account] FROM [account] WHERE [status_id] = 1")
             row = cursor.fetchone()
             if row:
                 account_id = row[0]
@@ -338,8 +332,8 @@ def demo_card_validation():
         
         if account_id:
             # Intentar transacción SIN tarjeta (comportamiento original)
-            print(f"✓ Cuenta seleccionada: {account_id}")
-            print(f"\n→ Ejecutando: create_simple_transaction() sin card_number")
+            print(f"OK Cuenta seleccionada: {account_id}")
+            print(f"\n-> Ejecutando: create_simple_transaction() sin card_number")
             result = create_simple_transaction(
                 account_id=account_id,
                 amount=5.00,
@@ -347,24 +341,24 @@ def demo_card_validation():
                 description="Depósito sin tarjeta - TEST",
                 created_by_user_id=1,
                 transaction_type_id=3  # Deposit
-                # ❌ NO se proporciona card_number ni card_token
+                # NO se proporciona card_number ni pin
             )
             
             if result['success']:
-                print(f"\n✅ TRANSACCIÓN EXITOSA (Sin validación de tarjeta)")
+                print(f"\nOK TRANSACCION EXITOSA (Sin validacion de tarjeta)")
                 print(f"  - ID Transacción: {result['transaction_id']}")
                 print(f"  - ID Ledger: {result['ledger_entry_id']}")
             else:
-                print(f"\n❌ TRANSACCIÓN FALLIDA")
+                print(f"\nERROR TRANSACCION FALLIDA")
                 print(f"  - Error: {result['error']}")
         else:
-            print("⚠️ No se encontraron cuentas activas para la prueba")
+            print("WARN No se encontraron cuentas activas para la prueba")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"ERROR: {e}")
     
     print("\n" + "="*70)
-    print("✅ PRUEBAS COMPLETADAS")
+    print("OK PRUEBAS COMPLETADAS")
     print("="*70 + "\n")
 
 

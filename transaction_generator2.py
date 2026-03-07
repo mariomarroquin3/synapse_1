@@ -33,9 +33,9 @@ def get_user_id_by_account(account_id: int) -> int:
         else: 
             raise Exception(f"La cuenta {account_id} no tiene usuario.")
 
-def get_card_tokens_for_account(account_id: int) -> List[str]:
+def get_card_pins_for_account(account_id: int) -> List[str]:
    
-    query = "SELECT [card_token] FROM [card] WHERE [account_id] = ?"
+    query = "SELECT [card_number_last4] FROM [card] WHERE [account_id] = ?"
     with get_cursor() as cursor:
         cursor.execute(query, (account_id,))
         return [str(row[0]) for row in cursor.fetchall()]
@@ -115,15 +115,15 @@ def run_multi_type_simulation(iterations: int = 20) -> None:
                 
             elif tx_type == 4:
                 # Solo intentamos pago si hay tarjetas
-                tokens = get_card_tokens_for_account(acc_id)
-                if not tokens:
-                    print(f"🛒 [{i+1}] PAYMENT: Saltado (Sin tarjetas en cuenta {acc_id})")
+                pins = get_card_pins_for_account(acc_id)
+                if not pins:
+                    print(f"CART [{i+1}] PAYMENT: Saltado (Sin tarjetas en cuenta {acc_id})")
                     continue
                     
-                token = random.choice(tokens)
+                pin = random.choice(pins)
                 bill_name = random.choice(["Netflix", "Spotify", "Luz", "Internet"])
-                print(f"🛒 [{i+1}] PAYMENT: {acc_id} pagando {bill_name} | ${amount}")
-                res = pay_bill_with_card(token, amount, bill_name, owner_user_id)
+                print(f"CART [{i+1}] PAYMENT: {acc_id} pagando {bill_name} | ${amount}")
+                res = pay_bill_with_card(pin, amount, bill_name, owner_user_id)
 
             # Verificación de éxito
             if res.get("success"):

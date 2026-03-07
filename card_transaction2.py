@@ -22,8 +22,8 @@ def obtener_datos_reales_bd() -> List[Dict[str, Any]]:
         SELECT 
             c.account_id, 
             a.user_id, 
-            c.card_number_last4, 
-            c.card_token 
+            c.card_number, 
+            c.card_number_last4 
         FROM [card] c
         INNER JOIN [account] a ON c.account_id = a.Id_account
         WHERE c.is_active = True
@@ -36,8 +36,8 @@ def obtener_datos_reales_bd() -> List[Dict[str, Any]]:
                 {
                     "account_id": row[0],
                     "user_id": int(row[1]),
-                    "last4": str(row[2]),
-                    "token": str(row[3])
+                    "card_number": str(row[2]),
+                    "pin": str(row[3])
                 } for row in filas
             ]
     except Exception as e:
@@ -61,7 +61,8 @@ def ejecutar_simulacion():
         monto = round(random.uniform(5.50, 150.00), 2)
         comercio = random.choice(["Netflix", "Amazon", "Starbucks", "Gasolinera", "Supermercado"])
         
-        print(f"👉 [{i}/{ITERACIONES}] Procesando Pago: **** {t['last4']} | {comercio} | ${monto}")
+        last4 = t['card_number'][-4:]
+        print(f"[{i}/{ITERACIONES}] Procesando Pago: **** {last4} | {comercio} | ${monto}")
 
         try:
             # Ejecución de la transacción
@@ -73,17 +74,17 @@ def ejecutar_simulacion():
                 description=f"Compra en {comercio}",
                 created_by_user_id=t["user_id"], # user_id real del dueño
                 transaction_type_id=TIPO_TX_PAGO,
-                card_number=t["last4"],          # Usamos last4 para buscar
-                pin=t["token"]            # Usamos token para validar
+                card_number=t["card_number"],    # Usamos el número de 16 dígitos
+                pin=t["pin"]                     # Usamos el PIN
             )
 
             if resultado.get("success"):
-                print(f"   ✅ APROBADO")
+                print(f"   [OK] APROBADO")
             else:
-                print(f"   ⚠️ RECHAZADO: {resultado.get('error')}")
+                print(f"   [WARN] RECHAZADO: {resultado.get('error')}")
 
         except Exception as e:
-            print(f"   ❌ ERROR CRÍTICO: {e}")
+            print(f"   [ERROR] CRÍTICO: {e}")
 
     print("\n--- Simulación Finalizada ---")
 
