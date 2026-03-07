@@ -14,32 +14,42 @@ def count_cards_by_account(account_id: int) -> int:
 
 def insert_card(account_id: int, card_type_id: int, card_number: str, pin: str, holder_name: str, exp_date: Any) -> int:
     """
-    Inserta una tarjeta con número completo (16 dígitos) y PIN de 4 dígitos.
-    
-    Args:
-        account_id: ID de la cuenta propietaria
-        card_type_id: Tipo de tarjeta (1=Débito, 2=Virtual, etc.)
-        card_number: Número completo de 16 dígitos
-        pin: PIN de 4 dígitos para validación
-        holder_name: Nombre del titular
-        exp_date: Fecha de expiración (datetime)
-        
-    Returns:
-        int: ID de la tarjeta insertada
+    Inserta una tarjeta con número completo de 16 dígitos y PIN.
     """
+
     query = """
         INSERT INTO [card] (
-            [account_id], [card_type_id], [card_number], 
-            [card_number_last4], [holder_name], [expiration_date], [created_at]
+            [account_id],
+            [card_type_id],
+            [card_number],
+            [card_number_last4],
+            [holder_name],
+            [expiration_date],
+            [created_at]
         ) VALUES (?, ?, ?, ?, ?, ?, Now())
     """
+
     with get_cursor(commit=True) as cursor:
-        cursor.execute(query, (account_id, card_type_id, card_number, pin, holder_name, exp_date))
-        
+        cursor.execute(query, (
+            account_id,
+            card_type_id,
+            card_number,
+            pin,  # aquí guardas el PIN
+            holder_name,
+            exp_date
+        ))
+
         cursor.execute("SELECT @@IDENTITY")
         row = cursor.fetchone()
+
         if not row:
             raise Exception("Error al recuperar ID de tarjeta.")
+
+        return int(row[0])
+
+        if not row:
+            raise Exception("Error al recuperar ID de tarjeta.")
+
         return int(row[0])
 
 def get_card_by_number(card_number: str):
@@ -83,22 +93,6 @@ def get_card_with_user(account_id: int):
             return dict(zip([col[0] for col in cursor.description], row))
         return None
     
-    
-def get_card_by_pin(input_pin: str) -> Optional[Dict[str, Any]]:
-    """
-    Busca por la columna card_number_last4 (que ahora es el PIN).
-    Mantiene el nombre de las llaves igual que la DB para no romper el código externo.
-    """
-    query = "SELECT * FROM [card] WHERE [card_number_last4] = ?"
-    with get_cursor() as cursor:
-        cursor.execute(query, (input_pin,))
-        row = cursor.fetchone()
-        if row:
-            # Esto genera automáticamente las llaves con los nombres de Access
-            columns = [col[0] for col in cursor.description] 
-            return dict(zip(columns, row))
-        return None
-
 def update_card_status(card_id: int, is_active: bool) -> bool:
     """
     Actualiza el estado booleano de la tarjeta.

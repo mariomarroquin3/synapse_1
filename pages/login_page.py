@@ -158,7 +158,7 @@ st.markdown("""
         © 2026 Synapse Digital Bank S.A. de C.V.<br>
         Seguridad Bancaria de El Salvador.<br>
         <a href="/admin_login" target="_self" style="color: #64748B; text-decoration: none; font-weight: 600; margin-top: 10px; display: inline-block;">
-            🔐 Inicio de sesión de admins
+            🔐 Inicio de sesión de empleados
         </a>
     </p>
 """, unsafe_allow_html=True)

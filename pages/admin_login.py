@@ -12,12 +12,12 @@ from utils.security import verify_password
 from utils.ui_components import apply_premium_style
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Synapse | Admin Portal", page_icon="🔐", layout="centered")
+st.set_page_config(page_title="Synapse | Portal Empleados", page_icon="🔐", layout="centered")
 
 # --- DISEÑO PREMIUM ---
 apply_premium_style()
 
-# CSS ADICIONAL (Branding de Admin)
+# CSS ADICIONAL (Branding de Empleados)
 st.markdown("""
 <style>
     .brand-title {
@@ -44,12 +44,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<h1 class="brand-title">Synapse Admin</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="brand-title">Synapse Empleados</h1>', unsafe_allow_html=True)
 st.markdown('<p class="brand-sub">PORTAL DE GESTIÓN INTERNA</p>', unsafe_allow_html=True)
 
 with st.form("admin_login_form"):
     st.markdown("<h4 style='text-align:center; color:white; margin-bottom:20px;'>Acceso Restringido</h4>", unsafe_allow_html=True)
-    a_email = st.text_input("Usuario Administrativo (Email)", placeholder="admin@synapse.com")
+    a_email = st.text_input("Usuario de Empleado (Email)", placeholder="empleado@synapse.com")
     a_pass = st.text_input("Contraseña", type="password", placeholder="••••••••")
     submit = st.form_submit_button("INICIAR SESIÓN", type="primary")
 

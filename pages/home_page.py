@@ -16,6 +16,8 @@ from utils.card_generator import generate_luhn_card_number
 from config.database import get_connection
 from utils.ui_components import apply_premium_style
 from utils.pdf_generator import generate_card_pdf
+# IMPORT DE LA TARJETA AZUL
+from card_print.generate_card_pdf import generate_card_pdf as generate_card_pdf2
 
 # --- 3. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
@@ -324,6 +326,23 @@ elif menu == "Mis Tarjetas":
                         st.markdown(f"Estado: <span style='color:{status_color}; font-weight:bold;'>{status_text}</span>", unsafe_allow_html=True)
                         
                         st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
+                        # BOTÓN GENERAR Y DESCARGAR TARJETA
+                        if st.button("🖨️ Generar tarjeta", key=f"print_card_{card_id}"):
+                            card_data_pdf = {
+                                "card_number": full_number,
+                                "expiration_date": exp_date,
+                                "full_name": holder
+                                }
+                            pdf_buffer = generate_card_pdf2(card_data_pdf, account["Id_account"])
+                            # limpiar espacios del nombre para el archivo
+                            safe_name = holder.replace(" ", "_")
+                            st.download_button(
+                                 label="📥 Descargar tarjeta PDF",
+                                   data=pdf_buffer,
+                                   file_name=f"Tarjeta_de_{safe_name}.pdf",
+                                   mime="application/pdf",
+                                   key=f"download_card_{card_id}"
+                                   )
         else:
             st.info("No tienes tarjetas vinculadas a esta cuenta.")
 
