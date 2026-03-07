@@ -117,7 +117,7 @@ with tab_reg:
             r_tel_raw = st.text_input("Teléfono", max_chars=8, placeholder="70000000")
             r_pass = st.text_input("Clave", type="password", placeholder="Clave segura")
             r_conf = st.text_input("Confirmar", type="password", placeholder="Repite tu clave")
-            r_gen = st.selectbox("Género", ["Masculino", "Femenino", "Otro"])
+            r_gen = st.selectbox("Género", ["Masculino", "Femenino"])
         
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
         btn_reg = st.form_submit_button("REGISTRARME AHORA", type="primary")

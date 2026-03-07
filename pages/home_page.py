@@ -157,51 +157,125 @@ elif menu == "Transferencias":
 
 elif menu == "Historial de Movimientos":
     st.subheader("Historial de Movimientos")
+
     if not account["Id_account"]:
         st.warning("No tienes una cuenta bancaria asociada para ver el historial.")
     else:
         all_history = get_all_account_history(account["Id_account"])
+
         if all_history:
-            # Diccionario para nombres amigables de tipos
-            type_names = {1: "Transferencia", 2: "Retiro", 3: "Depósito", 4: "Pago con Tarjeta"}
-            
-            # Crear pestañas para separar movimientos
+
+            # --- OPCIÓN DE FILTRADO ---
+            st.markdown("### Opciones de Visualización")
+
+            apply_filter = st.checkbox("Filtrar por mes y año")
+
+            filtered_history = all_history
+
+            if apply_filter:
+
+                colf1, colf2 = st.columns(2)
+
+                months = {
+                    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+                    5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+                    9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
+                }
+
+                with colf1:
+                    selected_month = st.selectbox(
+                        "Seleccionar Mes",
+                        options=list(months.keys()),
+                        format_func=lambda x: months[x]
+                    )
+
+                with colf2:
+                    years = sorted({tx["date"].year for tx in all_history}, reverse=True)
+                    selected_year = st.selectbox("Seleccionar Año", options=years)
+
+                filtered_history = [
+                    tx for tx in all_history
+                    if tx["date"].month == selected_month and tx["date"].year == selected_year
+                ]
+
+            st.divider()
+
+            # Diccionario para nombres amigables
+            type_names = {
+                1: "Transferencia",
+                2: "Retiro",
+                3: "Depósito",
+                4: "Pago con Tarjeta"
+            }
+
             tab_todo, tab_trans, tab_retiro, tab_depo, tab_pago = st.tabs([
                 "Todos", "Transferencias", "Retiros", "Depósitos", "Pagos"
             ])
 
             def render_transactions(tx_list):
+
                 if not tx_list:
                     st.info("No hay movimientos en esta categoría.")
                     return
+
                 for tx in tx_list:
+
                     with st.container(border=True):
+
                         col_tx1, col_tx2 = st.columns([3, 1])
+
                         with col_tx1:
-                            st.markdown(f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}")
-                            st.markdown(f"**Tipo:** {type_names.get(tx['type_id'], 'Otro')}")
-                            st.markdown(f"**Descripción:** {tx['description']}")
-                        
+                            st.markdown(
+                                f"**Fecha:** {tx['date'].strftime('%Y-%m-%d %H:%M:%S')}"
+                            )
+
+                            st.markdown(
+                                f"**Tipo:** {type_names.get(tx['type_id'], 'Otro')}"
+                            )
+
+                            st.markdown(
+                                f"**Descripción:** {tx['description']}"
+                            )
+
                         with col_tx2:
+
                             if tx['entry_type'] == 'debit':
-                                st.markdown(f"### <span style='color:#EF4444;'>-$ {tx['amount']:,.2f}</span>", unsafe_allow_html=True)
+
+                                st.markdown(
+                                    f"### <span style='color:#EF4444;'>-$ {tx['amount']:,.2f}</span>",
+                                    unsafe_allow_html=True
+                                )
+
                             else:
-                                st.markdown(f"### <span style='color:#10B981;'>+$ {tx['amount']:,.2f}</span>", unsafe_allow_html=True)
+
+                                st.markdown(
+                                    f"### <span style='color:#10B981;'>+$ {tx['amount']:,.2f}</span>",
+                                    unsafe_allow_html=True
+                                )
 
             with tab_todo:
-                render_transactions(all_history)
-            
+                render_transactions(filtered_history)
+
             with tab_trans:
-                render_transactions([tx for tx in all_history if tx['type_id'] == 1])
-            
+                render_transactions(
+                    [tx for tx in filtered_history if tx['type_id'] == 1]
+                )
+
             with tab_retiro:
-                render_transactions([tx for tx in all_history if tx['type_id'] == 2])
-            
+                render_transactions(
+                    [tx for tx in filtered_history if tx['type_id'] == 2]
+                )
+
             with tab_depo:
-                render_transactions([tx for tx in all_history if tx['type_id'] == 3])
+                render_transactions(
+                    [tx for tx in filtered_history if tx['type_id'] == 3]
+                )
 
             with tab_pago:
-                render_transactions([tx for tx in all_history if tx['type_id'] == 4])
+                render_transactions(
+                    [tx for tx in filtered_history if tx['type_id'] == 4]
+                )
+
         else:
             st.info("No tienes movimientos registrados todavía.")
 
