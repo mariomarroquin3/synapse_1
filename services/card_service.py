@@ -53,7 +53,7 @@ def create_card_for_account(
             account_id=account_id, 
             card_type_id=card_type_id, 
             card_number=clean_number,
-            pin=pin,
+            pin=pin, # pin será insertado en card_number_last4 por el modelo
             holder_name=holder_name, 
             exp_date=exp_date
         )
@@ -120,11 +120,11 @@ def validate_card_for_transaction(cursor: Any, card_number: str, input_pin: str)
     print(f"[CARD_SERVICE] Validando tarjeta: {last4}...")
     
     try:
-        # Búsqueda: Encontrar tarjeta por número completo
+        # Búsqueda: Encontrar tarjeta por número completo (16 dígitos)
         query = """
-            SELECT [Id_card], [account_id], [card_token], [is_active], [expiration_date]
+            SELECT [Id_card], [account_id], [card_number_last4], [is_active], [expiration_date]
             FROM [card]
-            WHERE [card_number_last4] = ?
+            WHERE [card_number] = ?
         """
         cursor.execute(query, (clean_card_number,))
         row = cursor.fetchone()
@@ -148,14 +148,14 @@ def validate_card_for_transaction(cursor: Any, card_number: str, input_pin: str)
         
         # Validación 4: PIN coincide
         if str(stored_pin).strip() != str(input_pin).strip():
-            print(f"[CARD_SERVICE] ❌ PIN inválido")
+            print(f"[CARD_SERVICE] ERROR PIN inválido")
             return {"success": False, "error": "PIN de tarjeta incorrecto", "account_id": None, "last4": None}
         
-        print(f"[CARD_SERVICE] ✅ Tarjeta validada correctamente (Cuenta: {account_id})")
+        print(f"[CARD_SERVICE] OK Tarjeta validada correctamente (Cuenta: {account_id})")
         return {"success": True, "card_id": card_id, "account_id": account_id, "error": None, "last4": last4}
         
     except Exception as e:
-        print(f"[CARD_SERVICE] ❌ Error en validación: {str(e)}")
+        print(f"[CARD_SERVICE] ERROR Error en validacion: {str(e)}")
         raise Exception(f"Error validando tarjeta: {str(e)}")
 
 

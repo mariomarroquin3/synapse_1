@@ -29,12 +29,12 @@ def get_all_accounts() -> List[Dict[str, Any]]:
 
 
 def get_all_cards_info() -> List[Dict[str, Any]]:
-    """Obtiene las tarjetas disponibles usando los nombres reales de las columnas."""
-    # Columnas confirmadas:
-    # En [card]: account_id, card_number_last4, card_token
-    # En [account]: Id_account, user_id
+    """Obtiene las tarjetas disponibles usando los nombres reales de las columnas (Nuevos)."""
+    # Columnas nuevas:
+    # card_number: 16 dígitos
+    # card_number_last4: PIN de 4 dígitos
     query = """
-        SELECT c.[account_id], a.[user_id], c.[card_number_last4], c.[card_token] 
+        SELECT c.[account_id], a.[user_id], c.[card_number], c.[card_number_last4] 
         FROM [card] c
         INNER JOIN [account] a ON c.[account_id] = a.[Id_account]
     """
@@ -44,8 +44,8 @@ def get_all_cards_info() -> List[Dict[str, Any]]:
             {
                 "account_id": row[0], 
                 "user_id": int(row[1]), 
-                "card_number": str(row[2]),  # Mapeamos card_number_last4 (ya es 4 dígitos)
-                "card_token": str(row[3])
+                "card_number": str(row[2]),
+                "card_token": str(row[3]) # Seguimos llamando card_token internamente para no romper la simulación
             } 
             for row in cursor.fetchall()
         ]
@@ -53,7 +53,7 @@ def get_all_cards_info() -> List[Dict[str, Any]]:
 
 # --- 2. SIMULACIÓN COMPLETA ---
 def run_full_simulation(iterations: int = 15) -> None:
-    print(f"\n🚀 INICIANDO SIMULACIÓN MIXTA: {iterations} operaciones...")
+    print(f"\nINICIANDO SIMULACION MIXTA: {iterations} operaciones...")
     
     accounts_data = get_all_accounts()
     cards_data = get_all_cards_info()
@@ -62,7 +62,7 @@ def run_full_simulation(iterations: int = 15) -> None:
         print("❌ Error: Necesitas al menos 2 cuentas para simular.")
         return
         
-    print(f"✅ Cuentas: {len(accounts_data)} | Tarjetas: {len(cards_data)}\n")
+    print(f"OK - Cuentas: {len(accounts_data)} | Tarjetas: {len(cards_data)}\n")
 
     for i in range(iterations):
         res: Dict[str, Any] = {"success": False, "error": "No ejecutado"}
@@ -82,7 +82,7 @@ def run_full_simulation(iterations: int = 15) -> None:
                 from_user_id = from_acc_data['user_id']
                 to_account_id = to_acc_data['account_id']
                 
-                print(f"🔄 [{i+1}] TRANSFERENCIA: Cuenta {from_account_id} -> {to_account_id} | ${amount}")
+                print(f"--- [{i+1}] TRANSFERENCIA: Cuenta {from_account_id} -> {to_account_id} | ${amount}")
                 res = create_transfer(from_account_id, to_account_id, amount, "Transferencia de prueba", from_user_id)
 
             elif tx_type == 2:
@@ -91,7 +91,7 @@ def run_full_simulation(iterations: int = 15) -> None:
                 account_id = acc_data['account_id']
                 user_id = acc_data['user_id']
                 
-                print(f"💸 [{i+1}] RETIRO: Cuenta {account_id} | ${amount}")
+                print(f"OUT - [{i+1}] RETIRO: Cuenta {account_id} | ${amount}")
                 res = create_simple_transaction(
                     account_id=account_id, 
                     amount=amount, 
@@ -107,7 +107,7 @@ def run_full_simulation(iterations: int = 15) -> None:
                 account_id = acc_data['account_id']
                 user_id = acc_data['user_id']
                 
-                print(f"💰 [{i+1}] DEPÓSITO: Cuenta {account_id} | ${amount}")
+                print(f"IN - [{i+1}] DEPÓSITO: Cuenta {account_id} | ${amount}")
                 res = create_simple_transaction(
                     account_id=account_id, 
                     amount=amount, 
@@ -130,7 +130,7 @@ def run_full_simulation(iterations: int = 15) -> None:
                 card_token = card_info["card_token"]
                 merchant = random.choice(["Netflix", "Amazon", "Supermercado", "Gasolinera"])
                 
-                print(f"💳 [{i+1}] PAGO TARJETA: Cuenta {account_id} | Tarjeta {card_number[-4:]} | {merchant} | ${amount}")
+                print(f"CARD - [{i+1}] PAGO TARJETA: Cuenta {account_id} | Tarjeta {card_number[-4:]} | {merchant} | ${amount}")
                 res = create_simple_transaction(
                     account_id=account_id, 
                     amount=amount, 
@@ -138,18 +138,18 @@ def run_full_simulation(iterations: int = 15) -> None:
                     description=f"Compra en {merchant}", 
                     created_by_user_id=user_id,  # Usar user_id real de la tarjeta
                     transaction_type_id=4,
-                    card_number=card_number,      # 4 dígitos finales
-                    card_token=card_token          # Token actual de la BD
+                    card_number=card_number,      # 16 digitos
+                    pin=card_token                # PIN (antes token)
                 )
 
             # Resultados
             if res.get("success"):
-                print(f"   ✅ OK")
+                print(f"   OK")
             else:
-                print(f"   ⚠️ Falló: {res.get('error')}")
+                print(f"   WARN - Fallo: {res.get('error')}")
 
         except Exception as e:
-            print(f"   ❌ Error en iteración {i+1}: {e}")
+            print(f"   ERROR en iteracion {i+1}: {e}")
 
     print("\n--- Simulación Finalizada ---")
 

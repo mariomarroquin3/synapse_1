@@ -29,8 +29,8 @@ def insert_card(account_id: int, card_type_id: int, card_number: str, pin: str, 
     """
     query = """
         INSERT INTO [card] (
-            [account_id], [card_type_id], [card_number_last4], 
-            [card_token], [holder_name], [expiration_date], [created_at]
+            [account_id], [card_type_id], [card_number], 
+            [card_number_last4], [holder_name], [expiration_date], [created_at]
         ) VALUES (?, ?, ?, ?, ?, ?, Now())
     """
     with get_cursor(commit=True) as cursor:
@@ -44,7 +44,7 @@ def insert_card(account_id: int, card_type_id: int, card_number: str, pin: str, 
 
 def get_card_by_number(card_number: str):
     """Busca una tarjeta usando su número completo de 16 dígitos."""
-    query = "SELECT * FROM [card] WHERE [card_number_last4] = ?"
+    query = "SELECT * FROM [card] WHERE [card_number] = ?"
     with get_cursor() as cursor:
         cursor.execute(query, (card_number,))
         return cursor.fetchone() # Devuelve la tupla completa o None
@@ -68,7 +68,7 @@ def get_card_with_user(account_id: int):
     query = """
         SELECT 
             c.Id_card,
-            c.card_number_last4,
+            c.card_number,
             c.expiration_date,
             u.full_name
         FROM ([card] AS c 
@@ -84,12 +84,12 @@ def get_card_with_user(account_id: int):
         return None
     
     
-def get_card_by_token(input_pin: str) -> Optional[Dict[str, Any]]:
+def get_card_by_pin(input_pin: str) -> Optional[Dict[str, Any]]:
     """
-    Busca por la columna card_token (que es el PIN).
+    Busca por la columna card_number_last4 (que ahora es el PIN).
     Mantiene el nombre de las llaves igual que la DB para no romper el código externo.
     """
-    query = "SELECT * FROM [card] WHERE [card_token] = ?"
+    query = "SELECT * FROM [card] WHERE [card_number_last4] = ?"
     with get_cursor() as cursor:
         cursor.execute(query, (input_pin,))
         row = cursor.fetchone()

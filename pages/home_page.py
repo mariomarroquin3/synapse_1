@@ -294,19 +294,21 @@ elif menu == "Mis Tarjetas":
                 # card es ahora un diccionario
                 card_id = card.get("Id_card")
                 type_id = card.get("card_type_id")
-                card_number = card.get("card_number_last4")
+                full_number = card.get("card_number") # Ahora es el de 16 dígitos
                 holder = card.get("holder_name")
                 exp_date = card.get("expiration_date")
                 is_active = card.get("is_active")
                 
-                last4 = str(card_number) if card_number else "****"
+                # Para la visualización premium, mostramos el número completo formateado
+                display_number = str(full_number) if full_number else "0" * 16
+                formatted_number = " ".join([display_number[i:i+4] for i in range(0, 16, 4)])
                 
                 with cols[idx % 2]:
                     with st.container(border=True):
                         # Estética de tarjeta "Premium"
                         type_label = "DÉBITO" if type_id == 1 else "VIRTUAL"
                         st.caption(f"TARJETA {type_label}")
-                        st.markdown(f"#### **** **** **** {last4}")
+                        st.markdown(f"#### {formatted_number}")
                         
                         subcol1, subcol2 = st.columns(2)
                         with subcol1:
