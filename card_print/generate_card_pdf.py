@@ -1,4 +1,5 @@
 import io
+import os
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.lib import colors
