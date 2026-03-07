@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+from datetime import datetime
 import sys
 import os
 
@@ -14,6 +15,7 @@ from services.card_service import update_card_active_status, create_card_for_acc
 from utils.card_generator import generate_luhn_card_number
 from config.database import get_connection
 from utils.ui_components import apply_premium_style
+from utils.pdf_generator import generate_card_pdf
 
 # --- 3. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
@@ -329,9 +331,59 @@ elif menu == "Mis Tarjetas":
 
         # 2. SOLICITUD DE NUEVA TARJETA
         st.markdown("### Solicitar Nueva Tarjeta")
-        if len(cards) >= 2:
+        
+        # Inicializar estado para nueva tarjeta
+        if "new_card_data" not in st.session_state:
+            st.session_state.new_card_data = None
+
+        # Contar tarjetas actuales
+        num_cards = len(cards)
+
+        if num_cards >= 2:
             st.warning("Has alcanzado el límite máximo de 2 tarjetas por cuenta.")
-        else:
+            # Si hay datos de una tarjeta recién creada, los mostramos igual
+        
+        # Mostrar datos de la tarjeta recién creada (si existen)
+        if st.session_state.new_card_data:
+            data = st.session_state.new_card_data
+            st.success(f"¡Tarjeta emitida con éxito!")
+            st.markdown("### 📄 Datos de tu nueva tarjeta")
+            
+            # Formatear número para mostrar
+            f_num = data['full_number']
+            display_f_num = " ".join([f_num[i:i+4] for i in range(0, 16, 4)])
+            
+            st.info(f"**Número:** `{display_f_num}`")
+            st.warning(f"**PIN:** `{data['pin']}` - **¡IMPORTANTE!** Memoriza este PIN ahora.")
+            
+            # Generación de PDF
+            exp_date_str = (datetime.now().replace(year=datetime.now().year + 4)).strftime("%m/%y")
+            pdf_buffer = generate_card_pdf(
+                holder_name=data['holder_name'],
+                card_number=data['full_number'],
+                pin=data['pin'],
+                exp_date_str=exp_date_str,
+                card_type=data['type_name']
+            )
+            
+            st.download_button(
+                label="📥 Descargar información en PDF",
+                data=pdf_buffer,
+                file_name=f"datos_tarjeta_{data['last4']}.pdf",
+                mime="application/pdf",
+                key=f"download_btn_{data['last4']}" # Key única para evitar conflictos
+            )
+            
+            st.balloons()
+            
+            if st.button("Finalizar y ocultar datos", key="btn_finish_new_card"):
+                st.session_state.new_card_data = None
+                st.rerun()
+
+            st.info("Esta información permanecerá visible para que puedas copiarla. Haz clic en 'Finalizar' cuando hayas terminado.")
+        
+        # Mostrar el formulario SOLO si no se ha alcanzado el límite Y no hay una tarjeta recién creada mostrándose
+        elif num_cards < 2:
             with st.expander("Abrir formulario de solicitud"):
                 with st.form("new_card_form"):
                     type_options = {1: "Débito Física", 2: "Virtual"}
@@ -358,12 +410,13 @@ elif menu == "Mis Tarjetas":
                                 )
                                 
                                 if result.get("success"):
-                                    st.success(f"¡Tarjeta emitida con éxito!")
-                                    st.info(f"**Número:** {full_number}")
-                                    st.warning(f"**PIN:** {result['pin']} - Guardar en lugar seguro")
-                                    st.info(f"**Últimos 4 dígitos:** {result['last4']}")
-                                    st.balloons()
-                                    time.sleep(2)
+                                    st.session_state.new_card_data = {
+                                        "full_number": full_number,
+                                        "pin": result["pin"],
+                                        "last4": result["last4"],
+                                        "holder_name": holder_name,
+                                        "type_name": selected_type_name
+                                    }
                                     st.rerun()
                                 else:
                                     st.error(f"Error: {result.get('error')}")
