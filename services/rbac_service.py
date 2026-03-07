@@ -103,10 +103,19 @@ def execute_auditor_query() -> dict:
         
         data = []
         for row in rows:
+            desc = row[2] or ""
+            # Enmascarar números de tarjeta de 16 dígitos en la descripción
+            # Busca exactamente 16 dígitos consecutivos
+            desc = re.sub(
+                r'\b(\d{12})(\d{4})\b', 
+                r'**** **** **** \2', 
+                desc
+            )
+            
             data.append({
                 "transaction_date": row[0],
                 "amount": float(row[1]) if row[1] else 0.0,
-                "description": row[2] or "",
+                "description": desc,
                 "created_by": row[3] or "Sistema"
             })
             

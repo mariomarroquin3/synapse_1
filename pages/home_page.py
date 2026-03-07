@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # --- 2. IMPORTACIONES LOCALES ---
 from models.account_model import get_account_by_user, get_account_by_number
 from models.card_model import get_cards_by_account
-from services.transaction_service import get_account_balance, get_all_account_history, create_transfer
+from services.transaction_service import get_account_balance, get_all_account_history, create_transfer, process_card_payment
 from services.card_service import update_card_active_status, create_card_for_account
 from utils.card_generator import generate_luhn_card_number
 from config.database import get_connection
@@ -77,7 +77,7 @@ with head_col2:
 st.divider()
 
 # Menú de Navegación
-menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Mis Tarjetas", "Historial de Movimientos", "Mi Perfil"])
+menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Pago de Servicios", "Mis Tarjetas", "Historial de Movimientos", "Mi Perfil"])
 
 # --- BOTÓN DE CAJERO ---
 st.sidebar.divider()
@@ -427,3 +427,49 @@ elif menu == "Mi Perfil":
     st.write(f"**Email:** {user['email']}")
     st.write(f"**Teléfono:** {user['phone_number']}")
     st.write(f"**DUI:** {user['DUI']}")
+
+elif menu == "Pago de Servicios":
+    st.subheader("Pago de Servicios con Tarjeta")
+    if not account["Id_account"]:
+        st.warning("No tienes una cuenta bancaria asociada.")
+    else:
+        st.write("Realiza pagos en línea de forma rápida y segura utilizando el número de tarjeta y tu PIN.")
+        
+        with st.form("card_payment_form"):
+            card_number = st.text_input("Número de Tarjeta (16 dígitos)", max_chars=16, placeholder="1234567812345678")
+            pin = st.text_input("PIN de la Tarjeta", type="password", max_chars=4, placeholder="****")
+            amount = st.number_input("Monto a Pagar ($)", min_value=0.01, step=10.0, format="%.2f")
+            description = st.text_input("Descripción del Servicio", placeholder="Ej: Recibo de Luz, Pago por compras en línea, etc.")
+            
+            st.markdown('<div class="btn-success">', unsafe_allow_html=True)
+            submit_payment = st.form_submit_button("Realizar Pago Ahora", type="primary", width="stretch")
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            if submit_payment:
+                if not card_number or len(card_number) != 16 or not card_number.isdigit():
+                    st.error("Por favor ingresa un número de tarjeta válido.")
+                elif not pin or len(pin) != 4 or not pin.isdigit():
+                    st.error("Por favor ingresa un PIN válido de 4 dígitos.")
+                elif amount <= 0:
+                    st.error("El monto debe ser mayor a cero.")
+                elif not description.strip():
+                    st.error("Ingresa la descripción del pago.")
+                else:
+                    with st.spinner("Procesando pago..."):
+                        time.sleep(1.5)
+                        
+                        resultado = process_card_payment(
+                            card_number=card_number,
+                            pin=pin,
+                            amount=amount,
+                            description=description,
+                            created_by_user_id=user["Id_user"]
+                        )
+                        
+                        if resultado.get("success"):
+                            st.success(f"¡Pago de ${amount:,.2f} procesado exitosamente!")
+                            st.balloons()
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error(f"Error procesando pago: {resultado.get('error')}")

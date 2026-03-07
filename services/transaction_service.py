@@ -330,6 +330,71 @@ def create_simple_transaction(account_id: int, amount: float,
         if cursor: cursor.close()
         if conn: conn.close()
 
+# ─────────────────────────────────────────────
+# Servicio de Pagos con Tarjeta (Servicios/Productos)
+# ─────────────────────────────────────────────
+def process_card_payment(card_number: str, pin: str, amount: float, description: str, created_by_user_id: int) -> dict[str, Any]:
+    """
+    Validar tarjeta y PIN para realizar el pago de un servicio sumando una transacción (Type=4, Status=1) y su débito.
+    """
+    if amount <= 0:
+        return {"success": False, "error": "El monto debe ser mayor a cero."}
+        
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # 1. Validar Credenciales: Exact match en DB
+        # card_number_last4 es la columna que almacena el PIN en este esquema.
+        sql_validate = """
+            SELECT Id_card, account_id, is_active 
+            FROM [card] 
+            WHERE card_number = ? AND card_number_last4 = ?
+        """
+        cursor.execute(sql_validate, (card_number, pin))
+        card_row = cursor.fetchone()
+        
+        if not card_row:
+            return {"success": False, "error": "Credenciales inválidas."}
+            
+        card_id, account_id, is_active = card_row
+        
+        if not is_active:
+            return {"success": False, "error": "La tarjeta se encuentra inactiva o bloqueada."}
+            
+        # 2. Verificar estado de la cuenta origen
+        acc_status = _check_account_active(account_id, is_debit=True)
+        if not acc_status["success"]:
+            return acc_status
+            
+        # 3. Comprobar fondos
+        current_balance = get_account_balance(account_id)
+        if current_balance < amount:
+            return {"success": False, "error": f"Fondos insuficientes. (Saldo disponible: ${current_balance:,.2f})"}
+            
+        # 4. Registrar la transacción (ID=4 Pago, Status=1 Aprobado automático)
+        status_id = 1
+        transaction_type_id = 4
+        # Agregar el número de la tarjeta a la descripción para trazabilidad y enmascaramiento posterior
+        full_description = f"{description} - Tarjeta: {card_number}"
+        
+        tx_id = _insert_transaction(cursor, transaction_type_id, status_id, full_description, created_by_user_id)
+        
+        # 5. Insertar débito en el Libro Mayor
+        create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=DEBIT)
+        
+        conn.commit()
+        return {"success": True, "transaction_id": tx_id, "message": "Pago realizado exitosamente."}
+        
+    except Exception as e:
+        if conn: conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+        
 def get_account_history_by_type(account_id: int, transaction_type_id: int) -> list:
     sql = '''
         SELECT t.transaction_date, t.description, l.amount, l.entry_type
