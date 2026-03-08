@@ -79,8 +79,9 @@ def execute_auditor_query() -> dict:
     Validación de seguridad incluida.
     """
     # Consulta detallada sin agregaciones destructivas
+    # Consulta detallada sin agregaciones destructivas. Limitado a TOP 50 por memoria.
     query = '''
-        SELECT
+        SELECT TOP 50
             t.transaction_date,
             (SELECT TOP 1 amount FROM ledger_entry WHERE transaction_id = t.Id_transaction) as amount,
             t.description,

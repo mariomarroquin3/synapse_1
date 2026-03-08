@@ -41,16 +41,157 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CÁLCULO DE MÉTRICAS (KPIs) ---
-if role_id == 3:
+@st.cache_data(ttl=600, max_entries=10)
+def get_admin_kpis():
     with get_cursor() as cursor:
         cursor.execute("SELECT COUNT(*) FROM [user] WHERE role_id = 2")
         total_clients = cursor.fetchone()[0]
         
         cursor.execute("SELECT COUNT(*) FROM [transaction] WHERE status_id = 2")
-        pending_count = cursor.fetchone()[0]
+        pending = cursor.fetchone()[0]
         
-        cursor.execute("SELECT COUNT(*) FROM [user] WHERE role_id IN (1, 3, 4, 5)") # Staff roles
-        staff_count = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM [user] WHERE role_id IN (1, 3, 4, 5)")
+        staff = cursor.fetchone()[0]
+        return total_clients, pending, staff
+
+@st.cache_data(ttl=600, max_entries=10)
+def cached_get_users(is_staff: bool):
+    return get_users_by_role_category(is_staff=is_staff)
+
+@st.cache_data(ttl=300, max_entries=10)
+def get_user_actions(user_id: int):
+    query = "SELECT DISTINCT [action] FROM [audit_log] WHERE [user_id] = ?"
+    with get_cursor() as cursor:
+        cursor.execute(query, (user_id,))
+        return [row[0] for row in cursor.fetchall() if row[0]]
+
+def _fetch_audit_logs(user_id: int, limit, start_date, end_date, action_type: str):
+    top_clause = f"TOP {limit}" if limit else ""
+    query = f"SELECT {top_clause} l.[Id_log], l.[action], l.[details], l.[created_at] FROM [audit_log] l WHERE l.[user_id] = ?"
+    params = [user_id]
+    
+    if start_date and end_date:
+        query += " AND l.[created_at] BETWEEN ? AND ?"
+        import datetime
+        dt_start = datetime.datetime.combine(start_date, datetime.time.min)
+        dt_end = datetime.datetime.combine(end_date, datetime.time.max)
+        params.extend([dt_start, dt_end])
+        
+    if action_type != "Todas":
+        query += " AND l.[action] = ?"
+        params.append(action_type)
+        
+    query += " ORDER BY l.[created_at] DESC"
+    
+    with get_cursor() as cursor:
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        return [list(row) for row in rows if row is not None and len(row) == 4]
+
+@st.cache_data(ttl=300, max_entries=20)
+def _cached_fetch_audit_logs(user_id: int, start_date, end_date, action_type: str):
+    return _fetch_audit_logs(user_id, 50, start_date, end_date, action_type)
+
+def get_filtered_audit_logs(user_id: int, limit, start_date, end_date, action_type: str):
+    if limit == 50:
+        return _cached_fetch_audit_logs(user_id, start_date, end_date, action_type)
+    return _fetch_audit_logs(user_id, limit, start_date, end_date, action_type)
+
+# --- GLOBAL PAGINATORS FOR ADMIN & AUDITOR TABS ---
+
+def _fetch_approval_history(limit):
+    top_clause = f"TOP {limit}" if limit else ""
+    query = f"""
+        SELECT {top_clause}
+            t.Id_transaction, t.description, t.transaction_date, 
+            a.amount, a.reviewed_at, a.review_notes,
+            tt.name AS type_name, u_req.full_name AS requester,
+            u_adm.full_name AS reviewer, ts.name AS status_name,
+            t.status_id
+        FROM (((([transaction] t
+        INNER JOIN transaction_approvals a ON t.Id_transaction = a.transaction_id)
+        INNER JOIN transaction_type tt ON t.transaction_type_id = tt.Id_transaction_type)
+        INNER JOIN [user] u_req ON t.created_by_user_id = u_req.Id_user)
+        LEFT JOIN [user] u_adm ON a.admin_id = u_adm.Id_user)
+        INNER JOIN transaction_status ts ON t.status_id = ts.Id_transaction_status
+        WHERE t.status_id IN (3, 5)
+        ORDER BY a.reviewed_at DESC
+    """
+    with get_cursor() as cursor:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        return [list(row) for row in rows if row is not None and len(row) == 11]
+
+@st.cache_data(ttl=300, max_entries=1)
+def _cached_fetch_approval_history():
+    return _fetch_approval_history(50)
+    
+def get_filtered_approval_history(limit):
+    if limit == 50:
+        return _cached_fetch_approval_history()
+    return _fetch_approval_history(limit)
+
+
+def _fetch_auditor_admin_logs(limit):
+    top_clause = f"TOP {limit}" if limit else ""
+    query = f"""
+        SELECT {top_clause}
+            l.[Id_log],
+            u.[full_name],
+            l.[action],
+            l.[details],
+            l.[created_at]
+        FROM [audit_log] l
+        INNER JOIN [user] u ON l.user_id = u.Id_user
+        ORDER BY l.[created_at] DESC
+    """
+    with get_cursor() as cursor:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        return [list(row) for row in rows if row is not None and len(row) == 5]
+
+@st.cache_data(ttl=300, max_entries=1)
+def _cached_fetch_auditor_admin_logs():
+    return _fetch_auditor_admin_logs(50)
+
+def get_filtered_auditor_admin_logs(limit):
+    if limit == 50:
+        return _cached_fetch_auditor_admin_logs()
+    return _fetch_auditor_admin_logs(limit)
+
+
+def _fetch_auditor_transactions(limit):
+    top_clause = f"TOP {limit}" if limit else ""
+    query = f"""
+        SELECT {top_clause}
+            t.[Id_transaction],
+            t.[transaction_type_id],
+            t.[status_id],
+            t.[description],
+            t.[created_by_user_id],
+            u.[full_name],
+            t.[transaction_date],
+            t.[processed_at]
+        FROM [transaction] t
+        INNER JOIN [user] u ON t.created_by_user_id = u.Id_user
+        ORDER BY t.[transaction_date] DESC
+    """
+    with get_cursor() as cursor:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        return [list(row) for row in rows if row is not None and len(row) == 8]
+        
+@st.cache_data(ttl=300, max_entries=1)
+def _cached_fetch_auditor_transactions():
+    return _fetch_auditor_transactions(50)
+
+def get_filtered_auditor_transactions(limit):
+    if limit == 50:
+        return _cached_fetch_auditor_transactions()
+    return _fetch_auditor_transactions(limit)
+
+if role_id == 3:
+    total_clients, pending_count, staff_count = get_admin_kpis()
 
 # --- CABECERA Y MÉTRICAS ---
 col_h1, col_h2 = st.columns([2, 1])
@@ -69,9 +210,15 @@ st.divider()
 # Dashboard Metrics
 if role_id == 3:
     col_m1, col_m2, col_m3 = st.columns(3)
-    col_m1.metric("Clientes Totales", f"{total_clients}", help="Usuarios registrados con rol de Cliente")
-    col_m2.metric("Aprobaciones Pendientes", f"{pending_count}", delta=f"{pending_count} TX", delta_color="inverse")
-    col_m3.metric("Personal Synapse", f"{staff_count}")
+    with col_m1:
+        with st.container(border=True):
+            st.metric("👥 Clientes Totales", f"{total_clients}", help="Usuarios registrados con rol de Cliente")
+    with col_m2:
+        with st.container(border=True):
+            st.metric("⏳ Aprobaciones Pendientes", f"{pending_count}", delta=f"{pending_count} TX", delta_color="inverse")
+    with col_m3:
+        with st.container(border=True):
+            st.metric("🏢 Personal Synapse", f"{staff_count}")
     st.divider()
 
 if role_id == 3:
@@ -130,14 +277,14 @@ if role_id == 3:
                             st.error(f"Error: {res['error']}")
 
         # Listar Personal
-        staff_users = get_users_by_role_category(is_staff=True)
+        staff_users = cached_get_users(is_staff=True)
         if staff_users:
             df_staff = pd.DataFrame(staff_users)
             df_staff = df_staff[['Id_user', 'full_name', 'email', 'role_id', 'is_active']]
             # Map roles
             role_map = {1: "Cajero", 3: "Admin", 4: "Analista", 5: "Auditor"}
             df_staff['Rol'] = df_staff['role_id'].map(role_map)
-            st.dataframe(df_staff, width="stretch")
+            st.dataframe(df_staff, hide_index=True, use_container_width=True)
         else:
             st.info("No hay personal registrado.")
 
@@ -146,7 +293,7 @@ if role_id == 3:
         st.header("Gestión de Cuentas de Clientes")
         st.info("Nota: Los administradores pueden gestionar clientes existentes pero no crearlos.")
 
-        clients = get_users_by_role_category(is_staff=False)
+        clients = cached_get_users(is_staff=False)
         if clients:
             # 1. Buscador
             search_query = st.text_input("🔍 Buscar cliente por nombre o correo", placeholder="Ej: Juan Pérez o juan@example.com").lower()
@@ -204,7 +351,7 @@ if role_id == 3:
         st.write("Gestiona el estado operativo (Activa, Bloqueada, Suspendida) de las cuentas y tarjetas.")
 
         # Obtener todos los clientes
-        clients_for_control = get_users_by_role_category(is_staff=False)
+        clients_for_control = cached_get_users(is_staff=False)
         
         if clients_for_control:
             search_control = st.text_input("🔍 Buscar cliente por nombre o correo", key="search_ctrl").lower()
@@ -365,26 +512,20 @@ if role_id == 3:
         st.header("Historial de Revisiones")
         st.write("Registro de transacciones que ya han sido procesadas por el equipo administrativo.")
 
-        history_query = """
-            SELECT 
-                t.Id_transaction, t.description, t.transaction_date, 
-                a.amount, a.reviewed_at, a.review_notes,
-                tt.name AS type_name, u_req.full_name AS requester,
-                u_adm.full_name AS reviewer, ts.name AS status_name,
-                t.status_id
-            FROM (((([transaction] t
-            INNER JOIN transaction_approvals a ON t.Id_transaction = a.transaction_id)
-            INNER JOIN transaction_type tt ON t.transaction_type_id = tt.Id_transaction_type)
-            INNER JOIN [user] u_req ON t.created_by_user_id = u_req.Id_user)
-            LEFT JOIN [user] u_adm ON a.admin_id = u_adm.Id_user)
-            INNER JOIN transaction_status ts ON t.status_id = ts.Id_transaction_status
-            WHERE t.status_id IN (3, 5)
-            ORDER BY a.reviewed_at DESC
-        """
+        if "show_all_approvals" not in st.session_state:
+            st.session_state.show_all_approvals = False
 
-        with get_cursor() as cursor:
-            cursor.execute(history_query)
-            movimientos = cursor.fetchall()
+        limit_app = None if st.session_state.show_all_approvals else 50
+
+        try:
+            if limit_app is None:
+                with st.spinner("Cargando historial completo de aprobaciones..."):
+                    movimientos = get_filtered_approval_history(limit_app)
+            else:
+                movimientos = get_filtered_approval_history(limit_app)
+        except Exception as e:
+            st.error(f"Error cargando aprobaciones: {e}")
+            movimientos = []
 
         if movimientos:
             for m in movimientos:
@@ -406,6 +547,16 @@ if role_id == 3:
                     with c3:
                         st.markdown("**Notas de Revisión:**")
                         st.info(notes if notes else "Sin observaciones.")
+            
+            st.divider()
+            if limit_app == 50 and len(movimientos) == 50:
+                if st.button("📂 Mostrar todo el historial de Aprobaciones", key="btn_show_all_approvals"):
+                    st.session_state.show_all_approvals = True
+                    st.rerun()
+            elif limit_app is None:
+                if st.button("🔽 Volver a los 50 más recientes", key="btn_show_last_approvals"):
+                    st.session_state.show_all_approvals = False
+                    st.rerun()
         else:
             st.info("No hay historial de revisiones disponible.")
 
@@ -415,69 +566,70 @@ if role_id == 3:
             st.header("⚙️ Configuración")
             st.subheader("📜 Historial de Tus Acciones Administrativas")
 
-            # CORRECCIÓN: Usamos 'S' en lugar de 'Id_log' y verificamos nombres
-            # Si en tu tabla la columna es 'user_id', mantenla; si falla, verifica si es 'Id_user'
-            query_audit = """
-                SELECT l.[Id_log], l.[action], l.[details], l.[created_at]
-                FROM [audit_log] l
-                WHERE l.[user_id] = ?
-                ORDER BY l.[created_at] DESC
-            """
+            import datetime
+            u_id = int(st.session_state['user_data']['Id_user'])
+            
+            with st.container(border=True):
+                st.markdown("#### 🔍 Filtros de Búsqueda")
+                col_f1, col_f2 = st.columns(2)
+                
+                try:
+                    acciones_unicas = get_user_actions(u_id)
+                except Exception:
+                    acciones_unicas = []
+                acciones = ["Todas"] + sorted(acciones_unicas)
+                
+                with col_f1:
+                    action_filter = st.selectbox("⚙️ Tipo de acción", acciones, key="filter_tab6_final")
+                
+                with col_f2:
+                    default_end = datetime.date.today()
+                    default_start = default_end - datetime.timedelta(days=30)
+                    date_range = st.date_input("📅 Rango de Fechas", value=(default_start, default_end), key="date_tab6")
+                    
+            start_date, end_date = None, None
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                start_date, end_date = date_range
+                
+            st.divider()
+
+            if "show_all_logs" not in st.session_state:
+                st.session_state.show_all_logs = False
+
+            limit = None if st.session_state.show_all_logs else 50
             
             try:
-                # Aseguramos que el ID de usuario sea el correcto desde la sesión
-                u_id = int(st.session_state['user_data']['Id_user'])
-                
-                with get_cursor() as cursor:
-                    cursor.execute(query_audit, (u_id,))
-                    logs = cursor.fetchall()
-
-                # Validamos que traiga las 4 columnas (S, action, details, created_at)
-                logs_validados = [list(row) for row in logs if row is not None and len(row) == 4]
+                if limit is None:
+                    with st.spinner("Cargando historial completo..."):
+                        logs_validados = get_filtered_audit_logs(u_id, limit, start_date, end_date, action_filter)
+                else:
+                    logs_validados = get_filtered_audit_logs(u_id, limit, start_date, end_date, action_filter)
 
                 if logs_validados:
                     df_logs = pd.DataFrame(logs_validados, columns=["ID", "Acción", "Detalles", "Fecha"])
                     df_logs["Fecha"] = pd.to_datetime(df_logs["Fecha"])
 
-                    # --- FILTROS ---
-                    acciones = ["Todas"] + sorted(df_logs["Acción"].dropna().unique().tolist())
-                    action_filter = st.selectbox("⚙️ Tipo de acción", acciones, key="filter_tab6_final")
-                    
-                    if action_filter != "Todas":
-                        df_logs = df_logs[df_logs["Acción"] == action_filter]
-
-                    use_date_filter = st.checkbox("Activar filtro por mes y año", key="enable_date_filter_tab6")
-                    if use_date_filter:
-                        months = list(range(1, 13))
-                        # Evitar error si el df está vacío tras el primer filtro
-                        if not df_logs.empty:
-                            years = list(range(int(df_logs['Fecha'].dt.year.min()), int(df_logs['Fecha'].dt.year.max()) + 1))
-                        else:
-                            years = [datetime.datetime.now().year]
-                            
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            sel_month = st.selectbox("📅 Mes", months, index=datetime.datetime.now().month - 1, key="month_tab6")
-                        with c2:
-                            sel_year = st.selectbox("📅 Año", years, index=len(years) - 1, key="year_tab6")
-                        
-                        df_logs = df_logs[
-                            (df_logs['Fecha'].dt.month == sel_month) &
-                            (df_logs['Fecha'].dt.year == sel_year)
-                        ]
-
                     st.dataframe(
                         df_logs.sort_values(by="Fecha", ascending=False),
                         height=450,
+                        hide_index=True,
                         use_container_width=True
                     )
                     st.caption(f"Mostrando {len(df_logs)} acciones registradas.")
+                    
+                    if limit == 50 and len(df_logs) == 50:
+                        if st.button("📂 Mostrar todos los registros de esta búsqueda"):
+                            st.session_state.show_all_logs = True
+                            st.rerun()
+                    elif limit is None:
+                        if st.button("🔽 Volver a los 50 más recientes"):
+                            st.session_state.show_all_logs = False
+                            st.rerun()
                 else:
-                    st.info("No has realizado acciones todavía.")
+                    st.info("No se encontraron registros con los filtros seleccionados.")
                     
             except Exception as e:
-                st.error(f"Error de base de datos: {e}")
-                st.warning("⚠️ Verifica que 'S' y 'user_id' sean los nombres reales de las columnas en la tabla 'audit_log'.")
+                st.error(f"Error de base de datos: {str(e)}")
 #--------------------------------------------------
 # PANEL CAJERO 
 # -------------------------------------------------
@@ -581,6 +733,7 @@ elif role_id == 4:
         if data['tipos']:
             st.dataframe(
                 df_tipos,
+                hide_index=True,
                 use_container_width=True
             )
 
@@ -604,23 +757,19 @@ if role_id == 5:
     with tab_admin:
         st.subheader("📜 Acciones de Personal y Configuración")
 
-        query_admin = """
-            SELECT 
-                l.[Id_log],
-                u.[full_name],
-                l.[action],
-                l.[details],
-                l.[created_at]
-            FROM [audit_log] l
-            INNER JOIN [user] u ON l.user_id = u.Id_user
-            ORDER BY l.[created_at] DESC
-        """
+        if "show_all_audit_admin" not in st.session_state:
+            st.session_state.show_all_audit_admin = False
+
+        limit_admin = None if st.session_state.show_all_audit_admin else 50
+
         try:
-            with get_cursor() as cursor:
-                cursor.execute(query_admin)
-                rows = cursor.fetchall()
+            if limit_admin is None:
+                with st.spinner("Cargando historial administrativo completo..."):
+                    rows = get_filtered_auditor_admin_logs(limit_admin)
+            else:
+                rows = get_filtered_auditor_admin_logs(limit_admin)
                 
-                if rows:
+            if rows:
                     # Crear DataFrame seguro
                     df_admin = pd.DataFrame.from_records(
                         rows,
@@ -670,10 +819,19 @@ if role_id == 5:
                             (df_admin['Fecha'].dt.year == selected_year)
                         ]
 
-                    st.dataframe(df_admin, height=450, use_container_width=True)
+                    st.dataframe(df_admin, height=450, hide_index=True, use_container_width=True)
                     st.caption(f"Mostrando {len(df_admin)} registros del historial administrativo.")
-                else:
-                    st.info("No hay registros en el registro de auditoría.")
+                    
+                    if limit_admin == 50 and len(df_admin) == 50:
+                        if st.button("📂 Mostrar todos los registros administrativos", key="btn_show_all_audit_admin"):
+                            st.session_state.show_all_audit_admin = True
+                            st.rerun()
+                    elif limit_admin is None:
+                        if st.button("🔽 Volver a los 50 más recientes", key="btn_show_last_audit_admin"):
+                            st.session_state.show_all_audit_admin = False
+                            st.rerun()
+            else:
+                st.info("No hay registros en el registro de auditoría.")
         except Exception as e:
             st.error(f"Error al cargar historial administrativo: {e}")
 
@@ -681,27 +839,19 @@ if role_id == 5:
     with tab_ops:
         st.subheader("📜 Movimientos y Transacciones")
 
-        query_trans = """
-            SELECT 
-                t.[Id_transaction],
-                t.[transaction_type_id],
-                t.[status_id],
-                t.[description],
-                t.[created_by_user_id],
-                u.[full_name],
-                t.[transaction_date],
-                t.[processed_at]
-            FROM [transaction] t
-            INNER JOIN [user] u ON t.created_by_user_id = u.Id_user
-            ORDER BY t.[transaction_date] DESC
-        """
+        if "show_all_audit_trans" not in st.session_state:
+            st.session_state.show_all_audit_trans = False
+
+        limit_trans = None if st.session_state.show_all_audit_trans else 50
 
         try:
-            with get_cursor() as cursor:
-                cursor.execute(query_trans)
-                rows = cursor.fetchall()
+            if limit_trans is None:
+                with st.spinner("Cargando transacciones completas..."):
+                    rows = get_filtered_auditor_transactions(limit_trans)
+            else:
+                rows = get_filtered_auditor_transactions(limit_trans)
 
-                if rows:
+            if rows:
                     columns = [
                         "ID Transacción", "Tipo_ID", "Status_ID", "Descripción",
                         "ID Usuario", "Usuario", "Fecha Creación", "Procesado En"
@@ -748,9 +898,18 @@ if role_id == 5:
                         "ID Transacción", "Usuario", "Tipo Nombre", "Descripción",
                         "Fecha Creación", "Procesado En", "Status_ID"
                     ]
-                    st.dataframe(df_filtered[display_cols], height=450, use_container_width=True)
+                    st.dataframe(df_filtered[display_cols], height=450, hide_index=True, use_container_width=True)
                     st.caption(f"Mostrando {len(df_filtered)} transacciones encontradas.")
-                else:
-                    st.info("No se encontraron registros de transacciones.")
+                    
+                    if limit_trans == 50 and len(df_filtered) == 50:
+                        if st.button("📂 Mostrar todas las transacciones", key="btn_show_all_audit_trans"):
+                            st.session_state.show_all_audit_trans = True
+                            st.rerun()
+                    elif limit_trans is None:
+                        if st.button("🔽 Volver a los 50 más recientes", key="btn_show_last_audit_trans"):
+                            st.session_state.show_all_audit_trans = False
+                            st.rerun()
+            else:
+                st.info("No se encontraron registros de transacciones.")
         except Exception as e:
             st.error(f"Error crítico al cargar historial de transacciones: {e}")

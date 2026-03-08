@@ -381,7 +381,7 @@ def process_card_payment(card_number: str, pin: str, amount: float, description:
             return {"success": False, "error": f"Fondos insuficientes. (Saldo disponible: ${current_balance:,.2f})"}
             
         # 4. Registrar la transacción (ID=4 Pago, Status=1 Aprobado automático)
-        status_id = 1
+        status_id = 3
         transaction_type_id = 4
         # Agregar el número de la tarjeta a la descripción para trazabilidad y enmascaramiento posterior
         full_description = f"{description} - Tarjeta: {card_number}"
