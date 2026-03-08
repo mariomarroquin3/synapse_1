@@ -4,6 +4,7 @@ import os
 import re
 import time
 import pandas as pd
+from services.audit_service import log_action
 
 # --- 1. CONFIGURACIÓN DE RUTAS ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -174,7 +175,14 @@ if role_id == 3:
 
                         btn_label = "Suspender" if client['is_active'] else "Activar"
                         if c4.button(btn_label, key=f"btn_{client['Id_user']}"):
-                            update_user_status(client['Id_user'], not client['is_active'])
+                            nuevo_estado = not client['is_active']
+                            update_user_status(client['Id_user'], nuevo_estado)
+                            accion = "SUSPENDER_USUARIO" if client['is_active'] else "ACTIVAR_USUARIO"
+                            log_action(
+                                st.session_state["user_data"]["Id_user"],
+                                  accion,
+                                  f"Admin cambió estado del usuario {client['full_name']} ({client['email']})"
+                                  )
                             st.success(f"Estado de {client['full_name']} actualizado.")
                             time.sleep(1)
                             st.rerun()
@@ -236,10 +244,16 @@ if role_id == 3:
                             
                             if new_ac_status != ac_status:
                                 try:
-                                    update_account_status(ac_id, new_ac_status)
-                                    st.success(f"Estado de cuenta {ac_num} actualizado correctamente.")
-                                    time.sleep(1)
-                                    st.rerun()
+                                     update_account_status(ac_id, new_ac_status)
+                                     log_action(
+                                          st.session_state["user_data"]["Id_user"],
+                                          "CAMBIO_ESTADO_CUENTA",
+                                          f"Admin cambió estado de la cuenta {ac_num} a {new_ac_status}"
+                                          )
+                                     st.success(f"Estado de cuenta {ac_num} actualizado correctamente.")
+                                     time.sleep(1)
+                                     st.rerun()
+                                    
                                 except Exception as e:
                                     st.error(f"Error: {str(e)}")
                                     
@@ -269,6 +283,11 @@ if role_id == 3:
                                         if is_active_new != bool(card["is_active"]):
                                             try:
                                                 update_card_status(card["Id_card"], is_active_new)
+                                                log_action(
+                                                    st.session_state["user_data"]["Id_user"],
+                                                    "CAMBIO_ESTADO_TARJETA",
+                                                    f"Admin cambió estado de la tarjeta ****{last4} a {'Activa' if is_active_new else 'Inactiva'}"
+                                                    )
                                                 st.toast(f"Estado de la tarjeta ...{last4} cambiado a {'Activa' if is_active_new else 'Inactiva'}", icon="✅")
                                                 time.sleep(1)
                                                 st.rerun()
@@ -390,12 +409,78 @@ if role_id == 3:
         else:
             st.info("No hay historial de revisiones disponible.")
 
-    # --- TAB 6: CONFIGURACIÓN ---
-    with tab6:
-        st.subheader("Estado del Sistema")
-        st.success("Sistemas operativos: DB Conectada | Motor de Transacciones Activo")
-        st.write("Configuraciones avanzadas y registros de auditoría (Próximamente).")
 
+    # --- TAB 6: CONFIGURACIÓN ---
+        with tab6:
+            st.header("⚙️ Configuración")
+            st.subheader("📜 Historial de Tus Acciones Administrativas")
+
+            # CORRECCIÓN: Usamos 'S' en lugar de 'Id_log' y verificamos nombres
+            # Si en tu tabla la columna es 'user_id', mantenla; si falla, verifica si es 'Id_user'
+            query_audit = """
+                SELECT l.[S], l.[action], l.[details], l.[created_at]
+                FROM [audit_log] l
+                WHERE l.[user_id] = ?
+                ORDER BY l.[created_at] DESC
+            """
+            
+            try:
+                # Aseguramos que el ID de usuario sea el correcto desde la sesión
+                u_id = int(st.session_state['user_data']['Id_user'])
+                
+                with get_cursor() as cursor:
+                    cursor.execute(query_audit, (u_id,))
+                    logs = cursor.fetchall()
+
+                # Validamos que traiga las 4 columnas (S, action, details, created_at)
+                logs_validados = [list(row) for row in logs if row is not None and len(row) == 4]
+
+                if logs_validados:
+                    df_logs = pd.DataFrame(logs_validados, columns=["ID", "Acción", "Detalles", "Fecha"])
+                    df_logs["Fecha"] = pd.to_datetime(df_logs["Fecha"])
+
+                    # --- FILTROS ---
+                    acciones = ["Todas"] + sorted(df_logs["Acción"].dropna().unique().tolist())
+                    action_filter = st.selectbox("⚙️ Tipo de acción", acciones, key="filter_tab6_final")
+                    
+                    if action_filter != "Todas":
+                        df_logs = df_logs[df_logs["Acción"] == action_filter]
+
+                    use_date_filter = st.checkbox("Activar filtro por mes y año", key="enable_date_filter_tab6")
+                    if use_date_filter:
+                        months = list(range(1, 13))
+                        # Evitar error si el df está vacío tras el primer filtro
+                        if not df_logs.empty:
+                            years = list(range(int(df_logs['Fecha'].dt.year.min()), int(df_logs['Fecha'].dt.year.max()) + 1))
+                        else:
+                            years = [datetime.datetime.now().year]
+                            
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            sel_month = st.selectbox("📅 Mes", months, index=datetime.datetime.now().month - 1, key="month_tab6")
+                        with c2:
+                            sel_year = st.selectbox("📅 Año", years, index=len(years) - 1, key="year_tab6")
+                        
+                        df_logs = df_logs[
+                            (df_logs['Fecha'].dt.month == sel_month) &
+                            (df_logs['Fecha'].dt.year == sel_year)
+                        ]
+
+                    st.dataframe(
+                        df_logs.sort_values(by="Fecha", ascending=False),
+                        height=450,
+                        use_container_width=True
+                    )
+                    st.caption(f"Mostrando {len(df_logs)} acciones registradas.")
+                else:
+                    st.info("No has realizado acciones todavía.")
+                    
+            except Exception as e:
+                st.error(f"Error de base de datos: {e}")
+                st.warning("⚠️ Verifica que 'S' y 'user_id' sean los nombres reales de las columnas en la tabla 'audit_log'.")
+#--------------------------------------------------
+# PANEL CAJERO 
+# -------------------------------------------------
 elif role_id == 1:
     st.header("Panel Operativo - Cajero")
     st.info("Buscador de Cuentas y Procesamiento de Transacciones rápidos.")
@@ -405,25 +490,30 @@ elif role_id == 1:
     from services.transaction_service import create_simple_transaction
     
     search_acc = st.text_input("🔍 Buscar Cuenta por Número (Ej. SV_synapse...)")
+    
     if search_acc:
         acc_data = get_account_by_number(search_acc)
+
         if acc_data:
             acc_id = acc_data[0] if isinstance(acc_data, (list, tuple)) else acc_data.get('Id_account')
             st.success(f"Cuenta encontrada: ID {acc_id}")
+
             with st.form("cajero_tx_form"):
                 tx_type = st.selectbox("Tipo de Operación", ["Depósito", "Retiro"])
                 tx_amount = st.number_input("Monto", min_value=0.01, step=10.0)
                 tx_desc = st.text_input("Descripción")
-                st.markdown('<div class="btn-success">', unsafe_allow_html=True)
+
                 sub_tx = st.form_submit_button("Procesar Operación", type="primary")
-                st.markdown('</div>', unsafe_allow_html=True)
+
                 if sub_tx:
                     if not tx_desc or tx_amount <= 0:
                         st.warning("Complete todos los campos de la operación.")
                     else:
-                        # 2 Retiro (Debit) / 3 Depósito (Credit)
+
+                        # 2 Retiro / 3 Depósito
                         t_id = 2 if tx_type == "Retiro" else 3
                         entry = "debit" if t_id == 2 else "credit"
+
                         res = create_simple_transaction(
                             account_id=acc_id,
                             amount=tx_amount,
@@ -432,65 +522,235 @@ elif role_id == 1:
                             created_by_user_id=st.session_state['user_data']['Id_user'],
                             transaction_type_id=t_id
                         )
+
                         if res.get('success'):
                             msg = res.get('message', 'Operación ejecutada con éxito.')
                             st.success(msg)
                         else:
                             st.error(res.get('error'))
+
         else:
             st.error("Cuenta no encontrada.")
-
+            
 elif role_id == 4:
     st.header("Panel de Métricas - Analista Financiero")
     st.write("Vista de solo lectura (Resumen global).")
+
     from services.rbac_service import execute_analyst_query
+    import pandas as pd
+
     res = execute_analyst_query()
+
     if res.get('status') == 200:
         data = res['data']
-        import pandas as pd
+
         col_a1, col_a2 = st.columns(2)
+
         with col_a1:
             st.subheader("Flujo de Caja Global")
+
             if data['flujo']:
                 df_flujo = pd.DataFrame(data['flujo'])
-                st.bar_chart(df_flujo, x='entry_type', y='total', color='#10B981')
+
+                st.bar_chart(
+                    df_flujo,
+                    x='entry_type',
+                    y='total'
+                )
             else:
-                st.info('Sin datos en contabilidad.')
+                st.info("Sin datos en contabilidad.")
+
         with col_a2:
             st.subheader("Volumen de Transacciones")
+
             if data['tipos']:
                 df_tipos = pd.DataFrame(data['tipos'])
-                st.bar_chart(df_tipos, x='name', y='count', color='#3B82F6')
+
+                st.bar_chart(
+                    df_tipos,
+                    x='name',
+                    y='count'
+                )
             else:
-                st.info('Sin datos por tipo.')
-        
+                st.info("Sin datos por tipo.")
+
         st.divider()
+
         st.subheader("Detalle de Volúmenes por Tipo")
+
         if data['tipos']:
-            st.dataframe(df_tipos, use_container_width=True)
+            st.dataframe(
+                df_tipos,
+                use_container_width=True
+            )
+
     else:
         st.error(res.get('error'))
 
-elif role_id == 5:
+
+import streamlit as st
+import pandas as pd
+from services.audit_service import log_action
+from config.database import get_cursor
+import datetime
+
+if role_id == 5:
     st.header("Control de Riesgos - Auditor")
     st.write("Historial Detallado de Operaciones del Sistema. (Solo Lectura)")
-    from services.rbac_service import execute_auditor_query
-    res = execute_auditor_query()
-    if res.get('status') == 200:
-        history = res['data']
-        if history:
-            import pandas as pd
-            df = pd.DataFrame(history)
-            
-            c_f1, c_f2 = st.columns([1, 2])
-            with c_f1:
-                filter_user = st.text_input('🔍 Filtrar historial por "created_by" (Usuario/Email)')
-            
-            if filter_user:
-                df = df[df['created_by'].astype(str).str.contains(filter_user, case=False, na=False)]
+
+    tab_admin, tab_ops = st.tabs(["Historial Administrativo", "Historial de Transacciones"])
+
+    # --- TAB 1: Historial Administrativo ---
+    with tab_admin:
+        st.subheader("📜 Acciones de Personal y Configuración")
+
+        query_admin = """
+            SELECT 
+                l.[S],
+                u.[full_name],
+                l.[action],
+                l.[details],
+                l.[created_at]
+            FROM [audit_log] l
+            INNER JOIN [user] u ON l.user_id = u.Id_user
+            ORDER BY l.[created_at] DESC
+        """
+        try:
+            with get_cursor() as cursor:
+                cursor.execute(query_admin)
+                rows = cursor.fetchall()
                 
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.info('El libro mayor está vacío.')
-    else:
-        st.error(res.get('error'))
+                if rows:
+                    # Crear DataFrame seguro
+                    df_admin = pd.DataFrame.from_records(
+                        rows,
+                        columns=["ID", "Administrador", "Acción", "Detalles", "Fecha"]
+                    )
+                    df_admin['Fecha'] = pd.to_datetime(df_admin['Fecha'])
+
+                    # --- FILTRO POR ACCIÓN (con "Todos") ---
+                    acciones_unicas = sorted(df_admin['Acción'].dropna().unique().tolist())
+                    selected_accion = st.selectbox(
+                        "Filtrado por acción",
+                        ["Todos"] + acciones_unicas,
+                        key="filter_accion_admin"
+                    )
+                    if selected_accion != "Todos":
+                        df_admin = df_admin[df_admin['Acción'] == selected_accion]
+
+                    # --- FILTRO POR ADMINISTRADOR ---
+                    search_admin = st.text_input(
+                        "🔎 Filtrado por Administrador",
+                        key="search_admin_audit"
+                    )
+                    if search_admin:
+                        df_admin = df_admin[
+                            df_admin['Administrador'].str.contains(search_admin, case=False, na=False)
+                        ]
+
+                    # --- FILTRO OPCIONAL POR MES Y AÑO ---
+                    use_date_filter = st.checkbox(
+                        "Activar filtro por mes y año",
+                        key="enable_date_filter_admin"
+                    )
+                    if use_date_filter:
+                        months = list(range(1, 13))
+                        years = list(range(df_admin['Fecha'].dt.year.min(), df_admin['Fecha'].dt.year.max() + 1))
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            selected_month = st.selectbox(
+                                "📅 Mes", months, index=datetime.datetime.now().month - 1, key="month_admin"
+                            )
+                        with col2:
+                            selected_year = st.selectbox(
+                                "📅 Año", years, index=len(years) - 1, key="year_admin"
+                            )
+                        df_admin = df_admin[
+                            (df_admin['Fecha'].dt.month == selected_month) &
+                            (df_admin['Fecha'].dt.year == selected_year)
+                        ]
+
+                    st.dataframe(df_admin, height=450, use_container_width=True)
+                    st.caption(f"Mostrando {len(df_admin)} registros del historial administrativo.")
+                else:
+                    st.info("No hay registros en el registro de auditoría.")
+        except Exception as e:
+            st.error(f"Error al cargar historial administrativo: {e}")
+
+    # --- TAB 2: Historial de Transacciones ---
+    with tab_ops:
+        st.subheader("📜 Movimientos y Transacciones")
+
+        query_trans = """
+            SELECT 
+                t.[Id_transaction],
+                t.[transaction_type_id],
+                t.[status_id],
+                t.[description],
+                t.[created_by_user_id],
+                u.[full_name],
+                t.[transaction_date],
+                t.[processed_at]
+            FROM [transaction] t
+            INNER JOIN [user] u ON t.created_by_user_id = u.Id_user
+            ORDER BY t.[transaction_date] DESC
+        """
+
+        try:
+            with get_cursor() as cursor:
+                cursor.execute(query_trans)
+                rows = cursor.fetchall()
+
+                if rows:
+                    columns = [
+                        "ID Transacción", "Tipo_ID", "Status_ID", "Descripción",
+                        "ID Usuario", "Usuario", "Fecha Creación", "Procesado En"
+                    ]
+                    df_trans = pd.DataFrame.from_records(rows, columns=columns)
+                    df_trans['Fecha Creación'] = pd.to_datetime(df_trans['Fecha Creación'])
+                    df_trans['Procesado En'] = pd.to_datetime(df_trans['Procesado En'])
+
+                    # --- MAPEO TIPO DE TRANSACCIÓN ---
+                    tipo_dict = {1: "Transferencia", 2: "Retiro", 3: "Depósito", 4: "Pago"}
+                    df_trans['Tipo Nombre'] = df_trans['Tipo_ID'].map(tipo_dict).fillna("Desconocido")
+
+                    # --- FILTROS ---
+                    col_f1, col_f2 = st.columns(2)
+                    with col_f1:
+                        search_user = st.text_input("🔎 Filtrar por Usuario", key="search_user_trans")
+                    with col_f2:
+                        tipo_options = ["Todos"] + list(tipo_dict.values())
+                        selected_tipo = st.selectbox("Filtrar por tipo de transacción", tipo_options, key="filter_tipo_trans")
+
+                    # Filtro opcional por Mes y Año
+                    use_date_filter = st.checkbox("📅 Activar filtro por mes y año", key="enable_date_filter_trans")
+
+                    df_filtered = df_trans.copy()
+                    if search_user:
+                        df_filtered = df_filtered[df_filtered['Usuario'].str.contains(search_user, case=False, na=False)]
+                    if selected_tipo != "Todos":
+                        df_filtered = df_filtered[df_filtered['Tipo Nombre'] == selected_tipo]
+                    if use_date_filter:
+                        available_years = sorted(df_filtered['Fecha Creación'].dt.year.unique().tolist(), reverse=True)
+                        if not available_years:
+                            available_years = [datetime.datetime.now().year]
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            sel_month = st.selectbox("Mes", list(range(1, 13)), index=datetime.datetime.now().month - 1, key="m_trans")
+                        with c2:
+                            sel_year = st.selectbox("Año", available_years, key="y_trans")
+                        df_filtered = df_filtered[
+                            (df_filtered['Fecha Creación'].dt.month == sel_month) &
+                            (df_filtered['Fecha Creación'].dt.year == sel_year)
+                        ]
+
+                    display_cols = [
+                        "ID Transacción", "Usuario", "Tipo Nombre", "Descripción",
+                        "Fecha Creación", "Procesado En", "Status_ID"
+                    ]
+                    st.dataframe(df_filtered[display_cols], height=450, use_container_width=True)
+                    st.caption(f"Mostrando {len(df_filtered)} transacciones encontradas.")
+                else:
+                    st.info("No se encontraron registros de transacciones.")
+        except Exception as e:
+            st.error(f"Error crítico al cargar historial de transacciones: {e}")
