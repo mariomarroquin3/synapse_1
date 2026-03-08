@@ -56,15 +56,22 @@ if user_accounts:
         if isinstance(active_row, (list, tuple)):
             account["Id_account"]     = active_row[0]
             account["account_number"] = active_row[2]
-            # [3] puede ser currency. Si hay diferencias, lo manejamos seguro abajo
+            account["currency"]       = active_row[3] if len(active_row) > 3 else "USD"
+            account["status_id"]      = active_row[4] if len(active_row) > 4 else 1
         elif isinstance(active_row, dict):
             account["Id_account"]     = active_row.get("Id_account")
             account["account_number"] = active_row.get("account_number", "Sin cuenta")
             account["currency"]       = active_row.get("currency", "USD")
+            account["status_id"]      = active_row.get("status_id", 1)
     except Exception as e:
         st.error(f"Error procesando datos de cuenta: {e}")
 else:
     st.warning("⚠️ No tienes cuentas bancarias activas.")
+
+if account.get("status_id") == 2:
+    st.error("⚠️ **Cuenta Bloqueada:** Esta cuenta no admite transacciones de salida de dinero. Por favor verifique con su administrador.")
+elif account.get("status_id") == 3:
+    st.error("🚫 **Cuenta Suspendida:** Esta cuenta ha sido suspendida temporalmente y no puede realizar movimientos.")
 
 # --- FUNCIONES ---
 def logout():
@@ -105,6 +112,9 @@ if user_accounts:
     if selected_acc != st.session_state["active_account_id"]:
         st.session_state["active_account_id"] = selected_acc
         st.rerun()
+
+st.sidebar.divider()
+st.sidebar.markdown("### Configuración")
 
 if len(user_accounts) < 5:
     st.sidebar.markdown('<div class="btn-success">', unsafe_allow_html=True)
