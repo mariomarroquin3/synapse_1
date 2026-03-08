@@ -18,6 +18,8 @@ from utils.ui_components import apply_premium_style
 from utils.pdf_generator import generate_card_pdf
 # IMPORT DE LA TARJETA AZUL
 from card_print.generate_card_pdf import generate_card_pdf as generate_card_pdf2
+# ESTADO DE CUENTA
+from card_print.user_pdf import generate_account_statement_pdf
 
 # --- 3. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
@@ -487,6 +489,71 @@ elif menu == "Mi Perfil":
     st.write(f"**Teléfono:** {user['phone_number']}")
     st.write(f"**DUI:** {user['DUI']}")
 
+    st.divider()
+    st.markdown("### 📄 Generar Estado de Cuenta PDF")
+
+    if account["Id_account"]:
+        all_history = get_all_account_history(account["Id_account"])
+        balance_actual = get_account_balance(account["Id_account"])
+
+        if all_history:
+            # --- Filtro opcional por mes y año ---
+            use_date_filter = st.checkbox("Filtrar por mes y año", key="profile_pdf_date_filter")
+            filtered_history = all_history
+            selected_month = None
+            selected_year = None
+
+            if use_date_filter:
+                months = {1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
+                          5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
+                          9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"}
+                col1, col2 = st.columns(2)
+                with col1:
+                    selected_month = st.selectbox(
+                        "Mes",
+                        options=list(months.keys()),
+                        format_func=lambda x: months[x]
+                    )
+                with col2:
+                    years = sorted({tx["date"].year for tx in all_history}, reverse=True)
+                    selected_year = st.selectbox("Año", options=years)
+
+                filtered_history = [
+                    tx for tx in all_history
+                    if tx["date"].month == selected_month and tx["date"].year == selected_year
+                ]
+
+            if st.button("📄 Generar Estado de Cuenta PDF"):
+                from card_print.user_pdf import generate_account_statement_pdf
+
+                pdf_buffer = generate_account_statement_pdf(
+                    user_name=user['full_name'],
+                    account_number=account['account_number'],
+                    balance=balance_actual,
+                    transactions=[
+                        {
+                            "date": tx["date"],
+                            "type": {1:"Transferencia",2:"Retiro",3:"Depósito",4:"Pago"}.get(tx["type_id"], "Otro"),
+                            "description": tx["description"],
+                            "amount": tx["amount"],
+                            "entry_type": tx["entry_type"]  # 'credit' o 'debit'
+                        }
+                        for tx in filtered_history
+                    ],
+                    month=selected_month,
+                    year=selected_year
+                )
+                st.download_button(
+                    label="📥 Descargar PDF",
+                    data=pdf_buffer,
+                    file_name=f"EstadoCuenta_{user['full_name'].replace(' ','_')}.pdf",
+                    mime="application/pdf"
+                )
+        else:
+            st.info("No hay movimientos registrados para esta cuenta.")
+    else:
+        st.warning("No tienes una cuenta asociada para generar el estado de cuenta.")                                  
+
 elif menu == "Pago de Servicios":
     st.subheader("Pago de Servicios con Tarjeta")
     if not account["Id_account"]:
@@ -531,4 +598,4 @@ elif menu == "Pago de Servicios":
                             time.sleep(2)
                             st.rerun()
                         else:
-                            st.error(f"Error procesando pago: {resultado.get('error')}")
+                            st.error(f"Error procesando pago: {resultado.get('error')}")                        
