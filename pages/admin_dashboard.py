@@ -543,3 +543,103 @@ elif role_id == 1:
 
         else:
             st.error("Cuenta no encontrada.")
+            
+elif role_id == 4:
+    st.header("Panel de Métricas - Analista Financiero")
+    st.write("Vista de solo lectura (Resumen global).")
+
+    from services.rbac_service import execute_analyst_query
+    import pandas as pd
+
+    res = execute_analyst_query()
+
+    if res.get('status') == 200:
+        data = res['data']
+
+        col_a1, col_a2 = st.columns(2)
+
+        with col_a1:
+            st.subheader("Flujo de Caja Global")
+
+            if data['flujo']:
+                df_flujo = pd.DataFrame(data['flujo'])
+
+                st.bar_chart(
+                    df_flujo,
+                    x='entry_type',
+                    y='total'
+                )
+            else:
+                st.info("Sin datos en contabilidad.")
+
+        with col_a2:
+            st.subheader("Volumen de Transacciones")
+
+            if data['tipos']:
+                df_tipos = pd.DataFrame(data['tipos'])
+
+                st.bar_chart(
+                    df_tipos,
+                    x='name',
+                    y='count'
+                )
+            else:
+                st.info("Sin datos por tipo.")
+
+        st.divider()
+
+        st.subheader("Detalle de Volúmenes por Tipo")
+
+        if data['tipos']:
+            st.dataframe(
+                df_tipos,
+                use_container_width=True
+            )
+
+    else:
+        st.error(res.get('error'))
+
+
+elif role_id == 5:
+    st.header("Control de Riesgos - Auditor")
+    st.write("Historial Detallado de operaciones del Sistema. (Solo Lectura)")
+
+    from services.rbac_service import execute_auditor_query
+    import pandas as pd
+
+    res = execute_auditor_query()
+
+    if res.get('status') == 200:
+
+        history = res['data']
+
+        if history:
+
+            df = pd.DataFrame(history)
+
+            c_f1, c_f2 = st.columns([1,2])
+
+            with c_f1:
+                filter_user = st.text_input(
+                    "🔎 Filtrar historial por 'created_by' (Usuario/Email)"
+                )
+
+            if filter_user:
+                df = df[
+                    df['created_by'].astype(str).str.contains(
+                        filter_user,
+                        case=False,
+                        na=False
+                    )
+                ]
+
+            st.dataframe(
+                df,
+                use_container_width=True
+            )
+
+        else:
+            st.info("El libro mayor está vacío.")
+
+    else:
+        st.error(res.get('error'))            
