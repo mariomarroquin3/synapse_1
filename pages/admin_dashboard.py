@@ -418,7 +418,7 @@ if role_id == 3:
             # CORRECCIÓN: Usamos 'S' en lugar de 'Id_log' y verificamos nombres
             # Si en tu tabla la columna es 'user_id', mantenla; si falla, verifica si es 'Id_user'
             query_audit = """
-                SELECT l.[S], l.[action], l.[details], l.[created_at]
+                SELECT l.[Id_log], l.[action], l.[details], l.[created_at]
                 FROM [audit_log] l
                 WHERE l.[user_id] = ?
                 ORDER BY l.[created_at] DESC
@@ -606,7 +606,7 @@ if role_id == 5:
 
         query_admin = """
             SELECT 
-                l.[S],
+                l.[Id_log],
                 u.[full_name],
                 l.[action],
                 l.[details],
