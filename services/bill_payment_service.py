@@ -44,7 +44,7 @@ def pay_bill_with_card(
         entry_type=ENTRY_DEBIT, 
         description=f"Pago Tarjeta: {bill_description}",
         created_by_user_id=user_id,
-        transaction_type_id=TX_TYPE_PAYMENT
+        transaction_type_id=TX_TYPE_PAYMENT,
     )
     
     # Forzamos el tipado para que el IDE deje de marcar "Unknown"
