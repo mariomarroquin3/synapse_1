@@ -53,13 +53,22 @@ def generate_account_number() -> str:
 # ═══════════════════════════════════════════════════════════════════════════
 
 def get_account_by_user(user_id: int) -> Optional[Dict[str, Any]]:
-    """Retrieves the account associated with a user."""
+    """Retrieves the (first) account associated with a user."""
     query = "SELECT * FROM [account] WHERE [user_id] = ?"
 
     with get_cursor() as cursor:
         cursor.execute(query, (user_id,))
         row = cursor.fetchone()
         return _row_to_dict(cursor, row)
+
+def get_accounts_by_user(user_id: int) -> list:
+    """Retrieves all accounts associated with a user."""
+    query = "SELECT * FROM [account] WHERE [user_id] = ?"
+
+    with get_cursor() as cursor:
+        cursor.execute(query, (user_id,))
+        rows = cursor.fetchall()
+        return [_row_to_dict(cursor, row) for row in rows] if rows else []
 
 
 def get_account_by_number(account_number: str) -> Optional[Dict[str, Any]]:
@@ -284,6 +293,15 @@ def create_account(user_id: int, currency: str) -> int:
             raise Exception("Could not retrieve account ID")
         
         return int(result[0])
+
+def create_new_account(user_id: int, currency: str = "USD") -> int:
+    """
+    Creates a new account for a user, enforcing the 5-account limit.
+    """
+    existing_accounts = get_accounts_by_user(user_id)
+    if len(existing_accounts) >= 5:
+        raise ValueError("Límite alcanzado: Un usuario no puede tener más de 5 cuentas.")
+    return create_account(user_id, currency)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ACCOUNT STATE MANAGEMENT

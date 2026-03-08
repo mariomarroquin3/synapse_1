@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
 from models.user_model import get_users_by_role_category, update_user_status
-from models.account_model import get_account_by_user, update_account_status
+from models.account_model import get_accounts_by_user, update_account_status
 from models.card_model import get_cards_by_account, update_card_status
 from services.user_service import register_user_with_permissions
 from services.transaction_service import review_transaction
@@ -206,12 +206,19 @@ if role_id == 3:
             for client in clients_for_control:
                 with st.expander(f"👤 {client['full_name']} | ✉️ {client['email']}"):
                     # 1. Obtener y renderizar la Cuenta
-                    account = get_account_by_user(client["Id_user"])
-                    st.markdown("#### 🏦 Cuenta Bancaria")
-                    if account:
-                        ac_id = account["Id_account"]
-                        ac_num = account["account_number"]
-                        ac_status = account["status_id"]
+                    accounts = get_accounts_by_user(client["Id_user"])
+                    
+                    if not accounts:
+                         st.info("Este cliente aún no tiene cuentas bancarias.")
+                         continue
+                         
+                    st.markdown("#### 🏦 Cuentas Bancarias")
+                    for acc_idx, account in enumerate(accounts):
+                        ac_id = account.get("Id_account", account[0] if isinstance(account, tuple) else None)
+                        if not ac_id: continue
+                        
+                        ac_num = account.get("account_number", account[2] if isinstance(account, tuple) else "N/A")
+                        ac_status = account.get("status_id", account[4] if isinstance(account, tuple) else 1)
                         
                         col_acc1, col_acc2 = st.columns([2, 1])
                         with col_acc1:
@@ -223,27 +230,22 @@ if role_id == 3:
                                 "Estado de la Cuenta",
                                 options=[1, 2, 3],
                                 format_func=lambda x: "✅ Activa" if x == 1 else ("⚠️ Bloqueada" if x == 2 else "🚫 Suspendida"),
-                                index=[1, 2, 3].index(ac_status),
+                                index=[1, 2, 3].index(ac_status) if ac_status in [1,2,3] else 0,
                                 key=f"acc_status_{ac_id}"
                             )
                             
                             if new_ac_status != ac_status:
                                 try:
                                     update_account_status(ac_id, new_ac_status)
-                                    st.success(f"Estado de cuenta actualizado correctamente.")
+                                    st.success(f"Estado de cuenta {ac_num} actualizado correctamente.")
                                     time.sleep(1)
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"Error: {str(e)}")
-                    else:
-                        st.info("Este cliente aún no tiene una cuenta bancaria.")
-                        
-                    st.divider()
-                    
-                    # 2. Obtener y renderizar las Tarjetas
-                    st.markdown("#### 💳 Tarjetas Vinculadas")
-                    if account:
-                        cards = get_cards_by_account(account["Id_account"])
+                                    
+                        # 2. Obtener y renderizar las Tarjetas de esta cuenta
+                        st.markdown(f"**💳 Tarjetas Vinculadas a {ac_num}**")
+                        cards = get_cards_by_account(ac_id)
                         if cards:
                             for card in cards:
                                 with st.container(border=True):
@@ -274,6 +276,9 @@ if role_id == 3:
                                                 st.error(f"Error: {str(e)}")
                         else:
                             st.info("No hay tarjetas vinculadas a esta cuenta.")
+                        
+                        if acc_idx < len(accounts) - 1:
+                            st.divider()
         else:
             st.info("No hay clientes registrados en el sistema.")
 

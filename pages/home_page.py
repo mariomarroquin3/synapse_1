@@ -8,7 +8,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
-from models.account_model import get_account_by_user, get_account_by_number
+from models.account_model import get_accounts_by_user, get_account_by_number, create_new_account
 from models.card_model import get_cards_by_account
 from services.transaction_service import get_account_balance, get_all_account_history, create_transfer, process_card_payment
 from services.card_service import update_card_active_status, create_card_for_account
@@ -34,7 +34,14 @@ if "logged_in" not in st.session_state or not st.session_state.logged_in:
 
 # --- CARGA DE DATOS ---
 user = st.session_state.user_data
-account_row = get_account_by_user(user["Id_user"])
+user_accounts = get_accounts_by_user(user["Id_user"])
+
+if "active_account_id" not in st.session_state:
+    st.session_state["active_account_id"] = user_accounts[0]["Id_account"] if user_accounts else None
+
+# Asegurarse de que el ID activo siga existiendo (por si se eliminó una cuenta, aunque no sucede en nuestro flujo)
+if user_accounts and st.session_state["active_account_id"] not in [acc["Id_account"] for acc in user_accounts]:
+     st.session_state["active_account_id"] = user_accounts[0]["Id_account"]
 
 account = {
     "Id_account": None,
@@ -42,21 +49,22 @@ account = {
     "currency": "USD"
 }
 
-if account_row:
+if user_accounts:
+    # Buscar el row de la cuenta activa
+    active_row = next((acc for acc in user_accounts if acc["Id_account"] == st.session_state["active_account_id"]), user_accounts[0])
     try:
-        # MAPEÓ UNIVERSAL (Soporta Tuplas de DB y Diccionarios)
-        if isinstance(account_row, (list, tuple)):
-            account["Id_account"]     = account_row[0]
-            account["account_number"] = account_row[2]
-            account["currency"]       = account_row[3]
-        elif isinstance(account_row, dict):
-            account["Id_account"]     = account_row.get("Id_account")
-            account["account_number"] = account_row.get("account_number", "Sin cuenta")
-            account["currency"]       = account_row.get("currency", "USD")
+        if isinstance(active_row, (list, tuple)):
+            account["Id_account"]     = active_row[0]
+            account["account_number"] = active_row[2]
+            # [3] puede ser currency. Si hay diferencias, lo manejamos seguro abajo
+        elif isinstance(active_row, dict):
+            account["Id_account"]     = active_row.get("Id_account")
+            account["account_number"] = active_row.get("account_number", "Sin cuenta")
+            account["currency"]       = active_row.get("currency", "USD")
     except Exception as e:
         st.error(f"Error procesando datos de cuenta: {e}")
 else:
-    st.warning("⚠️ No se encontró una cuenta activa para este usuario.")
+    st.warning("⚠️ No tienes cuentas bancarias activas.")
 
 # --- FUNCIONES ---
 def logout():
@@ -80,6 +88,38 @@ st.divider()
 
 # Menú de Navegación
 menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Pago de Servicios", "Mis Tarjetas", "Historial de Movimientos", "Mi Perfil"])
+
+# --- SELECTOR DE CUENTAS ---
+st.sidebar.divider()
+st.sidebar.markdown("### Mis Cuentas")
+
+if user_accounts:
+    account_options = {acc["Id_account"]: f"{acc.get('account_number')} ({acc.get('currency', 'USD')})" for acc in user_accounts}
+    selected_acc = st.sidebar.selectbox(
+        "Cuenta Activa",
+        options=list(account_options.keys()),
+        format_func=lambda x: account_options[x],
+        index=list(account_options.keys()).index(st.session_state["active_account_id"]) if st.session_state["active_account_id"] in account_options else 0
+    )
+    
+    if selected_acc != st.session_state["active_account_id"]:
+        st.session_state["active_account_id"] = selected_acc
+        st.rerun()
+
+if len(user_accounts) < 5:
+    st.sidebar.markdown('<div class="btn-success">', unsafe_allow_html=True)
+    if st.sidebar.button("➕ Abrir Nueva Cuenta", use_container_width=True):
+        try:
+            create_new_account(user["Id_user"])
+            st.toast("¡Nueva cuenta creada exitosamente!", icon="🎉")
+            time.sleep(1)
+            # Actualizamos de inmediato el estado global del id para auto seleccionarla, podríamos traerla pero el rerun lo hará
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(str(e))
+    st.sidebar.markdown('</div>', unsafe_allow_html=True)
+else:
+    st.sidebar.info("Límite de 5 cuentas alcanzado.")
 
 # --- BOTÓN DE CAJERO ---
 st.sidebar.divider()
