@@ -409,96 +409,48 @@ if role_id == 3:
         else:
             st.info("No hay historial de revisiones disponible.")
 
-# --- TAB 6: CONFIGURACIÓN ---
 
+    # --- TAB 6: CONFIGURACIÓN (DENTRO DEL IF ROLE_ID == 3) ---
         with tab6:
             st.header("⚙️ Configuración")
-            st.subheader("📜 Historial de Acciones Administrativas")
-            
-            query = """
-                SELECT 
-                    l.Id_log,
-                    u.full_name,
-                    l.action,
-                    l.details,
-                    l.created_at
+            st.subheader("📜 Historial de Tus Acciones Administrativas")
+
+            # Esta consulta devuelve exactamente 4 columnas
+            query_audit = """
+                SELECT l.Id_log, l.action, l.details, l.created_at
                 FROM audit_log l
-                INNER JOIN [user] u ON l.user_id = u.Id_user
+                WHERE l.user_id = ?
                 ORDER BY l.created_at DESC
             """
+            u_id = st.session_state['user_data']['Id_user']
 
-            # Obtener datos
             with get_cursor() as cursor:
-                cursor.execute(query)
+                cursor.execute(query_audit, (u_id,))
                 logs = cursor.fetchall()
 
-            logs = [list(row) for row in logs]
+            # Validación de seguridad: Nos aseguramos de que cada fila tenga 4 elementos
+            logs_validados = [list(row) for row in logs if row is not None and len(row) == 4]
 
-            if logs:
-
-                df_logs = pd.DataFrame(logs, columns=[
-                    "ID",
-                    "Administrador",
-                    "Acción",
-                    "Detalles",
-                    "Fecha"
-                ])
-
+            if logs_validados:
+                # Ahora las columnas coinciden perfectamente con los datos (4 = 4)
+                df_logs = pd.DataFrame(logs_validados, columns=["ID", "Acción", "Detalles", "Fecha"])
                 df_logs["Fecha"] = pd.to_datetime(df_logs["Fecha"])
 
-                # ---------------- FILTROS ----------------
-
-                col1, col2, col3 = st.columns(3)
-
+                # Filtros
+                col1, col2 = st.columns(2)
                 with col1:
-                    search_admin = st.text_input(
-                        "🔎 Buscar administrador",
-                        key="audit_search_admin"
-                    )
-
-                with col2:
                     acciones = ["Todas"] + sorted(df_logs["Acción"].unique())
-                    action_filter = st.selectbox(
-                        "⚙️ Tipo de acción",
-                        acciones,
-                        key="audit_action_filter"
-                    )
-
-                with col3:
-                    fecha = st.date_input(
-                        "📅 Filtrar por mes y año",
-                        key="audit_date_filter"
-                    )
-
-                # ---------------- FILTROS ----------------
-
-                if search_admin:
-                    df_logs = df_logs[
-                        df_logs["Administrador"].str.contains(search_admin, case=False)
-                    ]
+                    action_filter = st.selectbox("⚙️ Tipo de acción", acciones, key="filter_tab6_final")
 
                 if action_filter != "Todas":
-                    df_logs = df_logs[
-                        df_logs["Acción"] == action_filter
-                    ]
+                    df_logs = df_logs[df_logs["Acción"] == action_filter]
 
-                if fecha:
-                    df_logs = df_logs[
-                        (df_logs["Fecha"].dt.month == fecha.month) &
-                        (df_logs["Fecha"].dt.year == fecha.year)
-                    ]
-
-                # ---------------- TABLA ----------------
-
-                st.dataframe(
-                    df_logs.sort_values(by="Fecha", ascending=False),
-                    use_container_width=True
-                )
-
+                st.dataframe(df_logs.sort_values(by="Fecha", ascending=False), use_container_width=True)
             else:
-                st.info("No hay acciones administrativas registradas todavía.")
-
-# ================= PANEL CAJERO =================
+                st.info("No has realizado acciones todavía.")
+#--------------------------------------------------
+# PANEL CAJERO 
+# -------------------------------------------------
 elif role_id == 1:
     st.header("Panel Operativo - Cajero")
     st.info("Buscador de Cuentas y Procesamiento de Transacciones rápidos.")
@@ -610,42 +562,97 @@ elif role_id == 5:
     st.header("Control de Riesgos - Auditor")
     st.write("Historial Detallado de operaciones del Sistema. (Solo Lectura)")
 
-    from services.rbac_service import execute_auditor_query
+    # IMPORTANTE: Todo el código de abajo ahora tiene 4 espacios de sangría
     import pandas as pd
+    import datetime
+    from services.rbac_service import execute_auditor_query
 
+    # ------------------ HISTORIAL GENERAL ------------------
     res = execute_auditor_query()
 
     if res.get('status') == 200:
-
         history = res['data']
 
         if history:
+            df_history = pd.DataFrame(history)
 
-            df = pd.DataFrame(history)
-
-            c_f1, c_f2 = st.columns([1,2])
-
-            with c_f1:
-                filter_user = st.text_input(
-                    "🔎 Filtrar historial por 'created_by' (Usuario/Email)"
-                )
-
+            # Filtro por usuario/Email
+            filter_user = st.text_input("🔎 Filtrar historial por 'created_by' (Usuario/Email)")
             if filter_user:
-                df = df[
-                    df['created_by'].astype(str).str.contains(
-                        filter_user,
-                        case=False,
-                        na=False
-                    )
+                df_history = df_history[
+                    df_history['created_by'].astype(str).str.contains(filter_user, case=False, na=False)
                 ]
 
-            st.dataframe(
-                df,
-                use_container_width=True
-            )
-
+            st.subheader("📋 Historial de Operaciones")
+            st.dataframe(df_history, use_container_width=True)
         else:
             st.info("El libro mayor está vacío.")
-
     else:
-        st.error(res.get('error'))            
+        st.error(res.get('error'))
+
+    # ------------------ HISTORIAL DE ACCIONES ADMINISTRATIVAS ------------------
+    st.divider()
+    st.subheader("📜 Historial de Acciones Administrativas")
+
+    query = """
+        SELECT 
+            l.Id_log,
+            u.full_name,
+            l.action,
+            l.details,
+            l.created_at
+        FROM audit_log l
+        INNER JOIN [user] u ON l.user_id = u.Id_user
+        ORDER BY l.created_at DESC
+    """
+
+    with get_cursor() as cursor:
+        cursor.execute(query)
+        logs = cursor.fetchall()
+
+    # --- PROTECCIÓN: solo filas con 5 elementos ---
+    logs = [list(row) for row in logs if row is not None and len(row) == 5]
+
+    if logs:
+        df_logs = pd.DataFrame(logs, columns=[
+            "ID", "Administrador", "Acción", "Detalles", "Fecha"
+        ])
+        df_logs["Fecha"] = pd.to_datetime(df_logs["Fecha"])
+
+        # ---------------- FILTROS ----------------
+        col1, col2, col3 = st.columns([2, 2, 2])
+
+        with col1:
+            search_admin = st.text_input("🔎 Filtrar por administrador", key="audit_search")
+
+        with col2:
+            action_filter = st.selectbox(
+                "⚙️ Filtrar por tipo de acción",
+                ["Todas"] + sorted(df_logs["Acción"].unique()),
+                key="audit_action"
+            )
+
+        with col3:
+            filter_by_date = st.checkbox("Filtrar por mes y año")
+            if filter_by_date:
+                months = list(range(1, 13))
+                years = list(range(2020, datetime.datetime.now().year + 1))
+                selected_month = st.selectbox("Mes", months, index=datetime.datetime.now().month-1, key="month_select")
+                selected_year = st.selectbox("Año", years, index=len(years)-1, key="year_select")
+
+        # Aplicar filtros
+        if search_admin:
+            df_logs = df_logs[df_logs["Administrador"].str.contains(search_admin, case=False)]
+
+        if action_filter != "Todas":
+            df_logs = df_logs[df_logs["Acción"] == action_filter]
+
+        if filter_by_date and 'selected_month' in locals():
+            df_logs = df_logs[
+                (df_logs["Fecha"].dt.month == selected_month) &
+                (df_logs["Fecha"].dt.year == selected_year)
+            ]
+
+        st.dataframe(df_logs.sort_values(by="Fecha", ascending=False), use_container_width=True)
+    else:
+        st.info("No hay acciones administrativas registradas todavía.")
