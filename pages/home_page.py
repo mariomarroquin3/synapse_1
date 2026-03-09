@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
 from models.account_model import get_accounts_by_user, get_account_by_number, create_new_account
-from models.card_model import get_cards_by_account
+from models.card_model import get_cards_by_account, is_card_near_expiration, check_pending_renewal, request_card_renewal
 from services.transaction_service import get_account_balance, get_all_account_history, create_transfer, process_card_payment
 from services.card_service import update_card_active_status, create_card_for_account
 from utils.card_generator import generate_luhn_card_number
@@ -377,7 +377,24 @@ elif menu == "Mis Tarjetas":
                         status_color = "#10B981" if is_active else "#EF4444"
                         st.markdown(f"Estado: <span style='color:{status_color}; font-weight:bold;'>{status_text}</span>", unsafe_allow_html=True)
                         
-                        st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
+                        # --- FLUJO DE RENOVACIÓN DE TARJETAS ---
+                        is_renewing = check_pending_renewal(card_id)
+                        
+                        if is_renewing:
+                            st.info("⏳ Renovación en curso. Acérquese a una sucursal para retirar su nueva tarjeta.", icon="⏳")
+                        elif is_card_near_expiration(exp_date):
+                            st.warning("⚠️ Su tarjeta expirará pronto.")
+                            if st.button("🔄 Renovar Tarjeta ($5.00)", key=f"btn_renew_card_{card_id}"):
+                                with st.spinner("Procesando pago de renovación..."):
+                                    res = request_card_renewal(card_id, account["Id_account"], user["Id_user"])
+                                    if res.get("success"):
+                                        st.success("¡Pago exitoso! Acuda a una sucursal para finalizar.")
+                                        time.sleep(2)
+                                        st.rerun()
+                                    else:
+                                        st.error(f"Error en renovación: {res.get('error')}")
+                        else:
+                            st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
                         # BOTÓN GENERAR Y DESCARGAR TARJETA
                         if st.button("🖨️ Generar tarjeta", key=f"print_card_{card_id}"):
                             card_data_pdf = {

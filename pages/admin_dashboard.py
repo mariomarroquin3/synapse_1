@@ -640,6 +640,7 @@ elif role_id == 1:
     # Buscador de cuenta visual para el cajero
     from models.account_model import get_account_by_number
     from services.transaction_service import create_simple_transaction
+    from models.card_model import get_pending_renewals, finalize_card_renewal
     
     search_acc = st.text_input("🔍 Buscar Cuenta por Número (Ej. SV_synapse...)")
     
@@ -683,6 +684,34 @@ elif role_id == 1:
 
         else:
             st.error("Cuenta no encontrada.")
+            
+    st.divider()
+    st.subheader("💳 Entrega de Renovaciones de Tarjeta")
+    
+    renewals = get_pending_renewals()
+    if not renewals:
+        st.info("No hay tarjetas pendientes de entrega por renovación.")
+    else:
+        for r in renewals:
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([1.5, 2, 1])
+                with c1:
+                    st.markdown(f"**Cliente:** {r['full_name']}")
+                    st.caption(f"DUI: {r['DUI']}")
+                with c2:
+                    st.markdown(f"**Tarjeta (****{r['card_number_last4']})**")
+                    st.caption(f"Cuenta: {r['account_number']} | Solicitado: {r['requested_at'].strftime('%d/%m/%Y %H:%M') if r['requested_at'] else 'N/A'}")
+                with c3:
+                    st.markdown('<div class="btn-success">', unsafe_allow_html=True)
+                    if st.button("Confirmar Identidad y Entregar", key=f"btn_delivery_{r['Id_renewal']}", type="primary"):
+                        try:
+                            if finalize_card_renewal(r['Id_renewal'], r['card_id'], st.session_state['user_data']['Id_user']):
+                                st.success("¡Tarjeta renovada y activada exitosamente!")
+                                time.sleep(2)
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error en entrega: {e}")
+                    st.markdown('</div>', unsafe_allow_html=True)
             
 elif role_id == 4:
     st.header("Panel de Métricas - Analista Financiero")
