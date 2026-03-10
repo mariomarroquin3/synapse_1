@@ -1100,3 +1100,5 @@ if role_id == 5:
                 st.info("No se encontraron registros de transacciones.")
         except Exception as e:
             st.error(f"Error crítico al cargar historial de transacciones: {e}")
+
+            
