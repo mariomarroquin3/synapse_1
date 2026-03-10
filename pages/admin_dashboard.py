@@ -657,6 +657,31 @@ elif role_id == 1:
 
     st.subheader("📋 Solicitudes de Apertura de Cuenta")
 
+    # BOTÓN PARA APROBAR TODAS
+    if st.button("⚡ Aprobar todas las solicitudes pendientes"):
+
+        pending_accounts = get_pending_accounts()
+
+        if not pending_accounts:
+            st.info("No hay cuentas pendientes para aprobar.")
+
+        else:
+            for acc in pending_accounts:
+
+                approve_account(acc['Id_account'])
+
+                log_action(
+                    st.session_state['user_data']['Id_user'],
+                    "APROBAR_CUENTA",
+                    f"Aprobación automática de cuenta {acc['account_number']}"
+                )
+
+            st.success(f"{len(pending_accounts)} cuentas aprobadas automáticamente.")
+
+            time.sleep(1)
+
+            st.rerun()
+
     pending_accounts = get_pending_accounts()
 
     if not pending_accounts:
@@ -685,10 +710,9 @@ elif role_id == 1:
                             st.session_state['user_data']['Id_user'],
                             "APROBAR_CUENTA",
                             f"Cajero aprobó la cuenta {acc['account_number']}"
-                            )
+                        )
                         
                         approve_account(acc['Id_account'])
-
 
                         st.success("Cuenta aprobada")
 
@@ -713,6 +737,7 @@ elif role_id == 1:
                         st.rerun()
 
     st.divider()
+
 
     # -------------------------------------------------
     # BUSCADOR DE CUENTAS
