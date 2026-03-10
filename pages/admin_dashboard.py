@@ -17,6 +17,8 @@ from services.user_service import register_user_with_permissions
 from services.transaction_service import review_transaction
 from config.database import get_cursor
 from utils.ui_components import apply_premium_style
+from models.account_model import get_pending_accounts, approve_account, reject_account
+
 
 # --- SEGURIDAD DE PÁGINA ---
 if "user_data" not in st.session_state or st.session_state["user_data"]["role_id"] not in [1, 3, 4, 5]:
@@ -362,6 +364,11 @@ if role_id == 3:
                 with st.expander(f"👤 {client['full_name']} | ✉️ {client['email']}"):
                     # 1. Obtener y renderizar la Cuenta
                     accounts = get_accounts_by_user(client["Id_user"])
+                    accounts = [
+                        acc for acc in accounts
+                        if (acc.get("status_id", acc[4] if isinstance(acc, tuple) else None)) in [1,2,3]
+                        ]
+
                     
                     if not accounts:
                          st.info("Este cliente aún no tiene cuentas bancarias.")
@@ -630,18 +637,117 @@ if role_id == 3:
                     
             except Exception as e:
                 st.error(f"Error de base de datos: {str(e)}")
+                
 #--------------------------------------------------
 # PANEL CAJERO 
 # -------------------------------------------------
 elif role_id == 1:
     st.header("Panel Operativo - Cajero")
     st.info("Buscador de Cuentas y Procesamiento de Transacciones rápidos.")
-    
-    # Buscador de cuenta visual para el cajero
-    from models.account_model import get_account_by_number
+
+    # -------------------------------------------------
+    # SOLICITUDES DE APERTURA DE CUENTA
+    # -------------------------------------------------
+
+    from models.account_model import (
+        get_pending_accounts,
+        approve_account,
+        reject_account,
+        get_account_by_number
+    )
+
     from services.transaction_service import create_simple_transaction
     from models.card_model import get_pending_renewals, finalize_card_renewal
-    
+    from services.audit_service import log_action
+
+    st.subheader("📋 Solicitudes de Apertura de Cuenta")
+
+    # BOTÓN PARA APROBAR TODAS
+    if st.button("⚡ Aprobar todas las solicitudes pendientes"):
+
+        pending_accounts = get_pending_accounts()
+
+        if not pending_accounts:
+            st.info("No hay cuentas pendientes para aprobar.")
+
+        else:
+            for acc in pending_accounts:
+
+                approve_account(acc['Id_account'])
+
+                log_action(
+                    st.session_state['user_data']['Id_user'],
+                    "APROBAR_CUENTA",
+                    f"Aprobación automática de cuenta {acc['account_number']}"
+                )
+
+            st.success(f"{len(pending_accounts)} cuentas aprobadas automáticamente.")
+
+            time.sleep(1)
+
+            st.rerun()
+
+    pending_accounts = get_pending_accounts()
+
+    if not pending_accounts:
+        st.info("No hay solicitudes pendientes.")
+
+    else:
+        for acc in pending_accounts:
+
+            with st.container(border=True):
+
+                c1, c2, c3 = st.columns([2,2,1])
+
+                with c1:
+                    st.markdown(f"**Cuenta:** {acc['account_number']}")
+                    st.caption(f"ID Cuenta: {acc['Id_account']}")
+
+                with c2:
+                    st.markdown(f"**Usuario ID:** {acc['user_id']}")
+                    st.caption("Estado: Pendiente de aprobación")
+
+                with c3:
+
+                    if st.button("✅ Aprobar", key=f"approve_{acc['Id_account']}"):
+
+                        log_action(
+                            st.session_state['user_data']['Id_user'],
+                            "APROBAR_CUENTA",
+                            f"Cajero aprobó la cuenta {acc['account_number']}"
+                        )
+                        
+                        approve_account(acc['Id_account'])
+
+                        st.success("Cuenta aprobada")
+
+                        time.sleep(1)
+
+                        st.rerun()
+
+                    if st.button("❌ Rechazar", key=f"reject_{acc['Id_account']}"):
+
+                        reject_account(acc['Id_account'])
+
+                        log_action(
+                            st.session_state['user_data']['Id_user'],
+                            "RECHAZAR_CUENTA",
+                            f"Cajero rechazó la cuenta {acc['account_number']}"
+                        )
+
+                        st.error("Cuenta rechazada")
+
+                        time.sleep(1)
+
+                        st.rerun()
+
+    st.divider()
+
+
+    # -------------------------------------------------
+    # BUSCADOR DE CUENTAS
+    # -------------------------------------------------
+
     search_acc = st.text_input("🔍 Buscar Cuenta por Número (Ej. SV_synapse...)")
     
     if search_acc:
@@ -649,6 +755,11 @@ elif role_id == 1:
 
         if acc_data:
             acc_id = acc_data[0] if isinstance(acc_data, (list, tuple)) else acc_data.get('Id_account')
+            acc_status = acc_data[4] if isinstance(acc_data, (list, tuple)) else acc_data.get("status_id")
+            if acc_status != 1:
+                st.error("⚠️ Esta cuenta no está activa. No se pueden realizar operaciones.")
+                st.stop()
+
             st.success(f"Cuenta encontrada: ID {acc_id}")
 
             with st.form("cajero_tx_form"):
@@ -677,8 +788,17 @@ elif role_id == 1:
                         )
 
                         if res.get('success'):
+
                             msg = res.get('message', 'Operación ejecutada con éxito.')
+
+                            log_action(
+                                st.session_state['user_data']['Id_user'],
+                                "TRANSACCION",
+                                f"{tx_type} de ${tx_amount} en cuenta {search_acc}"
+                            )
+
                             st.success(msg)
+
                         else:
                             st.error(res.get('error'))
 
@@ -686,33 +806,71 @@ elif role_id == 1:
             st.error("Cuenta no encontrada.")
             
     st.divider()
+
+    # -------------------------------------------------
+    # ENTREGA DE TARJETAS RENOVADAS
+    # -------------------------------------------------
+
     st.subheader("💳 Entrega de Renovaciones de Tarjeta")
     
     renewals = get_pending_renewals()
+
     if not renewals:
         st.info("No hay tarjetas pendientes de entrega por renovación.")
+
     else:
         for r in renewals:
+
             with st.container(border=True):
+
                 c1, c2, c3 = st.columns([1.5, 2, 1])
+
                 with c1:
                     st.markdown(f"**Cliente:** {r['full_name']}")
                     st.caption(f"DUI: {r['DUI']}")
+
                 with c2:
                     st.markdown(f"**Tarjeta (****{r['card_number_last4']})**")
-                    st.caption(f"Cuenta: {r['account_number']} | Solicitado: {r['requested_at'].strftime('%d/%m/%Y %H:%M') if r['requested_at'] else 'N/A'}")
+                    st.caption(
+                        f"Cuenta: {r['account_number']} | "
+                        f"Solicitado: {r['requested_at'].strftime('%d/%m/%Y %H:%M') if r['requested_at'] else 'N/A'}"
+                    )
+
                 with c3:
                     st.markdown('<div class="btn-success">', unsafe_allow_html=True)
-                    if st.button("Confirmar Identidad y Entregar", key=f"btn_delivery_{r['Id_renewal']}", type="primary"):
+
+                    if st.button(
+                        "Confirmar Identidad y Entregar",
+                        key=f"btn_delivery_{r['Id_renewal']}",
+                        type="primary"
+                    ):
+
                         try:
-                            if finalize_card_renewal(r['Id_renewal'], r['card_id'], st.session_state['user_data']['Id_user']):
+
+                            if finalize_card_renewal(
+                                r['Id_renewal'],
+                                r['card_id'],
+                                st.session_state['user_data']['Id_user']
+                            ):
+
+                                log_action(
+                                    st.session_state['user_data']['Id_user'],
+                                    "ENTREGA_TARJETA",
+                                    f"Entrega de tarjeta terminada ****{r['card_number_last4']}"
+                                )
+
                                 st.success("¡Tarjeta renovada y activada exitosamente!")
+
                                 time.sleep(2)
+
                                 st.rerun()
+
                         except Exception as e:
                             st.error(f"Error en entrega: {e}")
+
                     st.markdown('</div>', unsafe_allow_html=True)
-            
+
+
 elif role_id == 4:
     st.header("Panel de Métricas - Analista Financiero")
     st.write("Vista de solo lectura (Resumen global).")
@@ -942,3 +1100,5 @@ if role_id == 5:
                 st.info("No se encontraron registros de transacciones.")
         except Exception as e:
             st.error(f"Error crítico al cargar historial de transacciones: {e}")
+
+            
