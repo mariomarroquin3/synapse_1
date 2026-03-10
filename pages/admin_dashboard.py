@@ -364,6 +364,11 @@ if role_id == 3:
                 with st.expander(f"👤 {client['full_name']} | ✉️ {client['email']}"):
                     # 1. Obtener y renderizar la Cuenta
                     accounts = get_accounts_by_user(client["Id_user"])
+                    accounts = [
+                        acc for acc in accounts
+                        if (acc.get("status_id", acc[4] if isinstance(acc, tuple) else None)) in [1,2,3]
+                        ]
+
                     
                     if not accounts:
                          st.info("Este cliente aún no tiene cuentas bancarias.")
@@ -750,6 +755,11 @@ elif role_id == 1:
 
         if acc_data:
             acc_id = acc_data[0] if isinstance(acc_data, (list, tuple)) else acc_data.get('Id_account')
+            acc_status = acc_data[4] if isinstance(acc_data, (list, tuple)) else acc_data.get("status_id")
+            if acc_status != 1:
+                st.error("⚠️ Esta cuenta no está activa. No se pueden realizar operaciones.")
+                st.stop()
+
             st.success(f"Cuenta encontrada: ID {acc_id}")
 
             with st.form("cajero_tx_form"):
