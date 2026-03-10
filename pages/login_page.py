@@ -4,6 +4,7 @@ import os
 import re
 import time
 
+
 # --- CONFIGURACIÓN DE RUTAS ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -17,6 +18,8 @@ from models.user_model import (
 from services.account_service import create_account_for_user
 from utils.security import hash_password, verify_password
 from utils.ui_components import apply_premium_style
+from models.account_model import get_account_by_user
+
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Synapse | Banca Digital", page_icon="🏦", layout="centered")
@@ -74,35 +77,64 @@ tab_login, tab_reg = st.tabs(["🔐 ACCESO", "📝 REGISTRO"])
 with tab_login:
     with st.form("login_form_final"):
         st.markdown("<h4 style='text-align:center; margin-bottom:25px; color:var(--text-primary);'>Inicia Sesión</h4>", unsafe_allow_html=True)
+
         l_email = st.text_input("Correo electrónico", placeholder="usuario@correo.com")
         l_pass = st.text_input("Contraseña", type="password", placeholder="••••••••")
+
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
         submit = st.form_submit_button("ENTRAR AL PORTAL", type="primary")
 
         if submit:
+
             if not l_email or not l_pass:
                 st.warning("Por favor completa tus datos.")
+
             else:
+
                 user = get_user_by_email(l_email)
-                # Validación exitosa usando Dictionary Keys
+
                 if user and verify_password(l_pass, user['password_hash']):
+
+                    # 🔎 BUSCAR CUENTA DEL USUARIO
+                    account = get_account_by_user(user['Id_user'])
+
+                    if account:
+
+                        status = account["status_id"]
+
+                        # ⏳ CUENTA PENDIENTE
+                        if status == 4:
+                            st.warning("⏳ Tu cuenta está pendiente de aprobación por el banco.")
+                            st.stop()
+
+                        # ❌ CUENTA RECHAZADA
+                        if status == 5:
+                            st.error("❌ Tu solicitud de cuenta fue rechazada. Contacta al banco.")
+                            st.stop()
+
+                    # ✅ LOGIN PERMITIDO
                     st.session_state["logged_in"] = True
-                    
-                    # 🚀 AQUI ESTÁ LA SOLUCIÓN: Usar las llaves en lugar de índices numéricos
+
                     st.session_state["user_data"] = {
                         "Id_user": user['Id_user'], 
                         "email": user['email'], 
                         "full_name": user['full_name'],
                         "DUI": user.get('dui', user.get('DUI', 'N/A')), 
                         "phone_number": user['phone_number'],
-                        "role_id": user['role_id']  # Agregado para Control de Roles
+                        "role_id": user['role_id']
                     }
-                    
+
                     st.success("Acceso concedido.")
+
                     time.sleep(0.5)
+
                     st.switch_page("pages/home_page.py")
+
                 else:
+
                     st.error("Credenciales no válidas.")
+
 
 with tab_reg:
     with st.form("reg_form_final"):
