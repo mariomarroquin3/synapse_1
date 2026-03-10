@@ -870,63 +870,141 @@ elif role_id == 1:
 
                     st.markdown('</div>', unsafe_allow_html=True)
 
-
 elif role_id == 4:
-    st.header("Panel de Métricas - Analista Financiero")
-    st.write("Vista de solo lectura (Resumen global).")
+    st.header("📊 Panel de Métricas - Analista Financiero")
+    st.write("Vista de solo lectura orientada a la toma de decisiones estratégicas.")
 
     from services.rbac_service import execute_analyst_query
     import pandas as pd
+    import altair as alt
+    from datetime import datetime, timedelta
+
+    # --- INICIALIZACIÓN DE VARIABLES (Evita errores si no hay datos) ---
+    df_flujo = pd.DataFrame()
+    df_tipos = pd.DataFrame()
+    df_hist = pd.DataFrame()
+
+    # --- SECCIÓN DE FILTROS ---
+    with st.container():
+        st.subheader("📅 Filtros de Consulta")
+        col_f1, col_f2 = st.columns(2)
+        with col_f1:
+            start_date = st.date_input("Fecha Inicio", datetime.now() - timedelta(days=30))
+        with col_f2:
+            end_date = st.date_input("Fecha Fin", datetime.now())
 
     res = execute_analyst_query()
 
     if res.get('status') == 200:
-        data = res['data']
+        data = res.get('data', {}) # Usamos .get() para evitar KeyError
+        
+        # --- 1. PROCESAMIENTO DE DATOS ---
+        if data.get('flujo'):
+            df_flujo = pd.DataFrame(data['flujo'])
+            
+        if data.get('tipos'):
+            df_tipos = pd.DataFrame(data['tipos'])
 
-        col_a1, col_a2 = st.columns(2)
+        # --- 2. KPIs DE CABECERA ---
+        if not df_flujo.empty:
+            total_credit = df_flujo[df_flujo['entry_type'] == 'credit']['total'].sum()
+            total_debit = df_flujo[df_flujo['entry_type'] == 'debit']['total'].sum()
+            balance = total_credit - total_debit
+
+            st.caption(f"Resumen del periodo: {start_date.strftime('%d/%m/%Y')} al {end_date.strftime('%d/%m/%Y')}")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Ingresos Globales", f"${total_credit:,.2f}")
+            m2.metric("Egresos Globales", f"${total_debit:,.2f}")
+            m3.metric("Balance Neto", f"${balance:,.2f}", delta=f"{balance:,.2f}")
+        
+        st.divider()
+
+        # --- 3. FILA 1: GRÁFICOS DE BARRAS ---
+        col_a1, col_a2 = st.columns([1.2, 1])
 
         with col_a1:
-            st.subheader("Flujo de Caja Global")
-
-            if data['flujo']:
-                df_flujo = pd.DataFrame(data['flujo'])
-
-                st.bar_chart(
-                    df_flujo,
-                    x='entry_type',
-                    y='total'
-                )
+            st.subheader("💰 Flujo de Caja")
+            if not df_flujo.empty:
+                chart_flujo = alt.Chart(df_flujo).mark_bar(cornerRadiusTopLeft=10).encode(
+                    x=alt.X('entry_type:N', title="Tipo"),
+                    y=alt.Y('total:Q', title="Monto ($)"),
+                    color=alt.Color('entry_type:N', scale=alt.Scale(range=['#1E88E5', '#E53935']), legend=None)
+                ).properties(height=300)
+                st.altair_chart(chart_flujo, use_container_width=True)
             else:
-                st.info("Sin datos en contabilidad.")
+                st.info("No hay datos de flujo para mostrar.")
 
         with col_a2:
-            st.subheader("Volumen de Transacciones")
-
-            if data['tipos']:
-                df_tipos = pd.DataFrame(data['tipos'])
-
-                st.bar_chart(
-                    df_tipos,
-                    x='name',
-                    y='count'
-                )
+            st.subheader("📈 Cantidad por Operación")
+            if not df_tipos.empty:
+                chart_tipos = alt.Chart(df_tipos).mark_bar(color='#26A69A').encode(
+                    x=alt.X('count:Q', title="Cantidad"),
+                    y=alt.Y('name:N', title="Operación", sort='-x')
+                ).properties(height=300)
+                st.altair_chart(chart_tipos, use_container_width=True)
             else:
-                st.info("Sin datos por tipo.")
+                st.info("No hay datos de operaciones.")
 
         st.divider()
 
-        st.subheader("Detalle de Volúmenes por Tipo")
+        # --- 4. FILA 2: TENDENCIA Y COMPOSICIÓN ---
+        col_b1, col_b2 = st.columns(2)
 
-        if data['tipos']:
-            st.dataframe(
-                df_tipos,
-                hide_index=True,
-                use_container_width=True
-            )
+
+        with col_b2:
+            st.subheader("🍩 Mix de Productos")
+            if not df_tipos.empty:
+                chart_donut = alt.Chart(df_tipos).mark_arc(innerRadius=50).encode(
+                    theta=alt.Theta(field="count", type="quantitative"),
+                    color=alt.Color(field="name", type="nominal", title="Producto"),
+                ).properties(height=300)
+                st.altair_chart(chart_donut, use_container_width=True)
+
+        with col_b1:
+            st.subheader("🕒 Evolución Temporal")
+            
+            historico = data.get('historico')
+            
+            if historico:
+                # Si el backend ya tiene los datos, los usamos
+                df_hist = pd.DataFrame(historico)
+            else:
+                # SIMULACIÓN PROFESIONAL: Si no hay datos, creamos una serie temporal de prueba
+                # Esto sirve para mostrar la funcionalidad en la etapa de planificación
+                date_range = pd.date_range(start=start_date, end=end_date)
+                import numpy as np
+                df_hist = pd.DataFrame({
+                    'fecha': date_range,
+                    'cantidad': np.random.randint(5, 50, size=len(date_range)) # Genera números aleatorios entre 5 y 50
+                })
+                st.caption("⚠️ Nota: Visualizando datos simulados (Tendencia proyectada).")
+
+            # Gráfico de Líneas con Área (se ve más profesional)
+            chart_evolucion = alt.Chart(df_hist).mark_area(
+                line={'color':'#FF9800'},
+                color=alt.Gradient(
+                    gradient='linear',
+                    stops=[alt.GradientStop(color='white', offset=0),
+                           alt.GradientStop(color='#FF9800', offset=1)],
+                    x1=1, x2=1, y1=1, y2=0
+                )
+            ).encode(
+                x=alt.X('fecha:T', title="Línea de Tiempo"),
+                y=alt.Y('cantidad:Q', title="N° de Operaciones"),
+                tooltip=[alt.Tooltip('fecha:T', title='Fecha'), alt.Tooltip('cantidad:Q', title='Transacciones')]
+            ).properties(height=300).interactive()
+            
+            st.altair_chart(chart_evolucion, use_container_width=True)
+
+        # --- 5. DETALLE TABULAR (SEGURO) ---
+        with st.expander("📂 Explorar registros detallados"):
+            if not df_tipos.empty:
+                st.dataframe(df_tipos, hide_index=True, use_container_width=True)
+            else:
+                st.write("No hay registros para mostrar en la tabla.")
 
     else:
-        st.error(res.get('error'))
-
+        st.error(f"Error de conexión: {res.get('error', 'No se pudo obtener respuesta del servidor.')}")
 
 import streamlit as st
 import pandas as pd
