@@ -103,49 +103,17 @@ st.sidebar.divider()
 st.sidebar.markdown("### Mis Cuentas")
 
 if user_accounts:
-    # 1. Creamos las opciones del selectbox con indicadores visuales de estado
-    account_options = {}
-    for acc in user_accounts:
-        base_text = f"{acc.get('account_number')} ({acc.get('currency', 'USD')})"
-        status = acc.get("status_id")
-        
-        if status == 4:
-            account_options[acc["Id_account"]] = f"⏳ {base_text} - Pendiente"
-        elif status == 5:
-            account_options[acc["Id_account"]] = f"❌ {base_text} - Rechazada"
-        else:
-            account_options[acc["Id_account"]] = f"✅ {base_text}"
-
-    # Asegurarnos de que el ID activo esté en las opciones (por si es la primera vez que carga)
-    current_active_id = st.session_state.get("active_account_id")
-    if current_active_id not in account_options:
-        current_active_id = list(account_options.keys())[0]
-        st.session_state["active_account_id"] = current_active_id
-
-    # 2. Renderizamos el selectbox
+    account_options = {acc["Id_account"]: f"{acc.get('account_number')} ({acc.get('currency', 'USD')})" for acc in user_accounts}
     selected_acc = st.sidebar.selectbox(
         "Cuenta Activa",
         options=list(account_options.keys()),
         format_func=lambda x: account_options[x],
-        index=list(account_options.keys()).index(current_active_id)
+        index=list(account_options.keys()).index(st.session_state["active_account_id"]) if st.session_state["active_account_id"] in account_options else 0
     )
     
-    if selected_acc != st.session_state.get("active_account_id"):
+    if selected_acc != st.session_state["active_account_id"]:
         st.session_state["active_account_id"] = selected_acc
         st.rerun()
-
-    # 3. VERIFICACIÓN DE ESTADO Y BLOQUEO DE UI
-    # Buscamos los datos completos de la cuenta seleccionada
-    active_account_data = next((acc for acc in user_accounts if acc["Id_account"] == st.session_state["active_account_id"]), None)
-
-    if active_account_data:
-        status = active_account_data.get("status_id")
-        if status == 4:
-            st.warning("### ⏳ Cuenta en Revisión\nEsta cuenta está pendiente de aprobación por nuestro equipo de cajeros. Una vez aprobada, podrás realizar operaciones con ella.")
-            st.stop() # Evita que se cargue el historial, saldos y botones de abajo
-        elif status == 5:
-            st.error("### ❌ Solicitud Rechazada\nLa solicitud para crear esta cuenta fue rechazada. Por favor, comunícate con soporte al cliente para más detalles.")
-            st.stop() # Evita que se cargue el resto de la página
 
 st.sidebar.divider()
 st.sidebar.markdown("### Configuración")
@@ -154,14 +122,10 @@ if len(user_accounts) < 5:
     st.sidebar.markdown('<div class="btn-success">', unsafe_allow_html=True)
     if st.sidebar.button("➕ Abrir Nueva Cuenta", use_container_width=True):
         try:
-            # Llama a la función para crear la cuenta
             create_new_account(user["Id_user"])
-            
-            # Mensajes de retroalimentación actualizados
-            st.toast("⏳ Solicitud enviada al cajero para aprobación.", icon="⏳")
-            st.sidebar.success("Tu solicitud de cuenta ha sido enviada y está en revisión.")
-            
-            time.sleep(2) 
+            st.toast("¡Nueva cuenta creada exitosamente!", icon="🎉")
+            time.sleep(1)
+            # Actualizamos de inmediato el estado global del id para auto seleccionarla, podríamos traerla pero el rerun lo hará
             st.rerun()
         except Exception as e:
             st.sidebar.error(str(e))
