@@ -655,6 +655,8 @@ elif role_id == 1:
         reject_account,
         get_account_by_number
     )
+    
+    from models.user_model import get_user_by_id
 
     from services.transaction_service import create_simple_transaction
     from models.card_model import get_pending_renewals, finalize_card_renewal
@@ -669,31 +671,35 @@ elif role_id == 1:
 
         if not pending_accounts:
             st.info("No hay cuentas pendientes para aprobar.")
-
         else:
             for acc in pending_accounts:
+                # --- Obtenemos nombre para el log ---
+                cliente = get_user_by_id(acc['user_id'])
+                nombre_cliente = cliente['full_name'] if cliente else f"Usuario ID {acc['user_id']}"
 
                 approve_account(acc['Id_account'])
 
                 log_action(
                     st.session_state['user_data']['Id_user'],
                     "APROBAR_CUENTA",
-                    f"Aprobación automática de cuenta {acc['account_number']}"
+                    f"Aprobación automática de cuenta {acc['account_number']} para: {nombre_cliente}"
                 )
-
+            
+            # --- FIX CACHÉ ---
+            st.cache_data.clear()
             st.success(f"{len(pending_accounts)} cuentas aprobadas automáticamente.")
-
             time.sleep(1)
-
             st.rerun()
 
     pending_accounts = get_pending_accounts()
 
     if not pending_accounts:
         st.info("No hay solicitudes pendientes.")
-
     else:
         for acc in pending_accounts:
+            # --- Obtenemos el cliente para mostrar su nombre en la interfaz ---
+            cliente = get_user_by_id(acc['user_id'])
+            nombre_cliente = cliente['full_name'] if cliente else f"Usuario ID {acc['user_id']}"
 
             with st.container(border=True):
 
@@ -704,41 +710,36 @@ elif role_id == 1:
                     st.caption(f"ID Cuenta: {acc['Id_account']}")
 
                 with c2:
-                    st.markdown(f"**Usuario ID:** {acc['user_id']}")
-                    st.caption("Estado: Pendiente de aprobación")
+                    # --- Mostramos el nombre real del cliente ---
+                    st.markdown(f"**Cliente:** {nombre_cliente}")
+                    st.caption(f"Usuario ID: {acc['user_id']} | Estado: Pendiente")
 
                 with c3:
 
                     if st.button("✅ Aprobar", key=f"approve_{acc['Id_account']}"):
-
+                        approve_account(acc['Id_account'])
                         log_action(
                             st.session_state['user_data']['Id_user'],
                             "APROBAR_CUENTA",
-                            f"Cajero aprobó la cuenta {acc['account_number']}"
+                            f"Cajero aprobó la cuenta {acc['account_number']} de {nombre_cliente}"
                         )
-                        
-                        approve_account(acc['Id_account'])
-
+                        # --- FIX CACHÉ ---
+                        st.cache_data.clear()
                         st.success("Cuenta aprobada")
-
                         time.sleep(1)
-
                         st.rerun()
 
                     if st.button("❌ Rechazar", key=f"reject_{acc['Id_account']}"):
-
                         reject_account(acc['Id_account'])
-
                         log_action(
                             st.session_state['user_data']['Id_user'],
                             "RECHAZAR_CUENTA",
-                            f"Cajero rechazó la cuenta {acc['account_number']}"
+                            f"Cajero rechazó la cuenta {acc['account_number']} de {nombre_cliente}"
                         )
-
+                        # --- FIX CACHÉ ---
+                        st.cache_data.clear()
                         st.error("Cuenta rechazada")
-
                         time.sleep(1)
-
                         st.rerun()
 
     st.divider()
