@@ -350,3 +350,14 @@ def reject_account(account_id: int) -> bool:
 
     return update_account_status(account_id, 5)
 
+
+
+def get_accounts_by_user_ids(user_ids: list) -> list:
+    if not user_ids: return []
+    placeholders = ','.join(['?'] * len(user_ids))
+    query = f'SELECT * FROM [account] WHERE [user_id] IN ({placeholders})'
+    with get_cursor() as cursor:
+        cursor.execute(query, tuple(user_ids))
+        rows = cursor.fetchall()
+        columns = [col[0] for col in cursor.description]
+        return [dict(zip(columns, row)) for row in rows] if rows else []

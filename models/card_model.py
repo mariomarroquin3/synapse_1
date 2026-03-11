@@ -72,6 +72,22 @@ def get_cards_by_account(account_id: int):
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in rows]
 
+def get_cards_by_account_ids(account_ids: list) -> list:
+    """
+    Recupera todas las tarjetas para una lista de IDs de cuenta en una sola consulta.
+    """
+    if not account_ids:
+        return []
+        
+    placeholders = ",".join(["?"] * len(account_ids))
+    query = f"SELECT * FROM [card] WHERE [account_id] IN ({placeholders})"
+    
+    with get_cursor() as cursor:
+        cursor.execute(query, tuple(account_ids))
+        rows = cursor.fetchall()
+        columns = [col[0] for col in cursor.description]
+        return [dict(zip(columns, row)) for row in rows] if rows else []
+
 def get_card_with_user(account_id: int):
     """
     Retorna información de la tarjeta y el usuario asociado.
@@ -226,3 +242,13 @@ def finalize_card_renewal(renewal_id: int, card_id: int, admin_id: int) -> bool:
         return True
     except Exception as e:
         raise Exception(f"Error procesando renovación final: {str(e)}")
+
+def get_cards_by_account_ids(account_ids: list) -> list:
+    if not account_ids: return []
+    placeholders = ','.join(['?'] * len(account_ids))
+    query = f'SELECT * FROM [card] WHERE [account_id] IN ({placeholders})'
+    with get_cursor() as cursor:
+        cursor.execute(query, tuple(account_ids))
+        rows = cursor.fetchall()
+        columns = [col[0] for col in cursor.description]
+        return [dict(zip(columns, row)) for row in rows] if rows else []

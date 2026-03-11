@@ -11,8 +11,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
 from models.user_model import get_users_by_role_category, update_user_status
-from models.account_model import get_accounts_by_user, update_account_status
-from models.card_model import get_cards_by_account, update_card_status
+from models.account_model import get_accounts_by_user, update_account_status, get_accounts_by_user_ids
+from models.card_model import get_cards_by_account, update_card_status, get_cards_by_account_ids
 from services.user_service import register_user_with_permissions
 from services.transaction_service import review_transaction
 from config.database import get_cursor
@@ -292,100 +292,125 @@ if role_id == 3:
 
     # --- TAB 2: GESTIÓN DE CLIENTES ---
     with tab2:
-        st.header("Gestión de Cuentas de Clientes")
-        st.info("Nota: Los administradores pueden gestionar clientes existentes pero no crearlos.")
+        st.header("Gestión de Usuarios")
+        st.write("Gestiona el estado de los usuarios (Clientes y Personal con Cuentas).")
 
-        clients = cached_get_users(is_staff=False)
-        if clients:
-            # 1. Buscador
-            search_query = st.text_input("🔍 Buscar cliente por nombre o correo", placeholder="Ej: Juan Pérez o juan@example.com").lower()
+        tab2_clientes, tab2_personal_con_cuentas = st.tabs(["👥 Clientes", "🏢 Personal con Cuentas"])
 
-            # Filtrar clientes por búsqueda
-            if search_query:
-                clients = [c for c in clients if search_query in c['full_name'].lower() or search_query in c['email'].lower()]
+        def render_user_list(user_list, search_query_val, is_staff_check=False):
+            if search_query_val:
+                user_list = [c for c in user_list if search_query_val in c['full_name'].lower() or search_query_val in c['email'].lower()]
+            
+            if is_staff_check:
+                # Optimized filtering: fetch all accounts once for these potential staff
+                u_ids = [u['Id_user'] for u in user_list]
+                all_staff_accs = get_accounts_by_user_ids(u_ids)
+                users_with_acc_ids = {a['user_id'] for a in all_staff_accs}
+                user_list = [u for u in user_list if u['Id_user'] in users_with_acc_ids]
 
-            # 2. Separación por Estados
+            if not user_list:
+                st.info("No se encontraron usuarios en esta categoría.")
+                return
+
             tab_activos, tab_suspendidos = st.tabs(["✅ Activos", "🚫 Suspendidos"])
-
-            def render_client_list(client_list):
-                if not client_list:
-                    st.info("No se encontraron clientes en esta categoría.")
+            
+            def render_sub_list(sub_list):
+                if not sub_list:
+                    st.info("No hay usuarios aquí.")
                     return
-
-                for client in client_list:
+                for usr in sub_list:
                     with st.container():
                         c1, c2, c3, c4 = st.columns([2, 2, 1, 1])
-                        status_text = "Activo" if client['is_active'] else "Suspendido"
-                        status_class = "status-active" if client['is_active'] else "status-suspended"
-
-                        c1.write(f"**{client['full_name']}**")
-                        c2.write(client['email'])
+                        status_text = "Activo" if usr['is_active'] else "Suspendido"
+                        status_class = "status-active" if usr['is_active'] else "status-suspended"
+                        c1.write(f"**{usr['full_name']}**")
+                        c2.write(usr['email'])
                         c3.markdown(f"<span class='{status_class}'>{status_text}</span>", unsafe_allow_html=True)
-
-                        btn_label = "Suspender" if client['is_active'] else "Activar"
-                        if c4.button(btn_label, key=f"btn_{client['Id_user']}"):
-                            nuevo_estado = not client['is_active']
-                            update_user_status(client['Id_user'], nuevo_estado)
-                            accion = "SUSPENDER_USUARIO" if client['is_active'] else "ACTIVAR_USUARIO"
-                            log_action(
-                                st.session_state["user_data"]["Id_user"],
-                                  accion,
-                                  f"Admin cambió estado del usuario {client['full_name']} ({client['email']})"
-                                  )
-                            st.success(f"Estado de {client['full_name']} actualizado.")
-                            time.sleep(1)
-                            st.rerun()
+                        btn_label = "Suspender" if usr['is_active'] else "Activar"
+                        if c4.button(btn_label, key=f"user_st_{usr['Id_user']}"):
+                            update_user_status(usr['Id_user'], not usr['is_active'])
+                            st.cache_data.clear()
+                            st.success(f"Estado de {usr['full_name']} actualizado.")
                     st.divider()
 
-            with tab_activos:
-                active_clients = [c for c in clients if c['is_active']]
-                render_client_list(active_clients)
+            with tab_activos: render_sub_list([u for u in user_list if u['is_active']])
+            with tab_suspendidos: render_sub_list([u for u in user_list if not u['is_active']])
 
-            with tab_suspendidos:
-                suspended_clients = [c for c in clients if not c['is_active']]
-                render_client_list(suspended_clients)
-        else:
-            st.info("No hay clientes registrados en el sistema.")
+        with tab2_clientes:
+            st.subheader("Gestión de Clientes Regulares")
+            clients_all = cached_get_users(is_staff=False)
+            search_q_cli = st.text_input("🔍 Buscar cliente", key="search_q_cli").lower()
+            render_user_list(clients_all if clients_all else [], search_q_cli, is_staff_check=False)
+
+        with tab2_personal_con_cuentas:
+            st.subheader("Gestión de Personal con Cuentas de Banco")
+            staff_all = cached_get_users(is_staff=True)
+            search_q_stf = st.text_input("🔍 Buscar personal", key="search_q_stf").lower()
+            render_user_list(staff_all if staff_all else [], search_q_stf, is_staff_check=True)
 
     # --- TAB 3: CONTROL DE CUENTAS Y TARJETAS ---
     with tab3:
-        st.header("Control de Cuentas y Tarjetas de Clientes")
+        st.header("Control de Cuentas y Tarjetas")
         st.write("Gestiona el estado operativo (Activa, Bloqueada, Suspendida) de las cuentas y tarjetas.")
 
-        # Obtener todos los clientes
-        clients_for_control = cached_get_users(is_staff=False)
-        
-        if clients_for_control:
-            search_control = st.text_input("🔍 Buscar cliente por nombre o correo", key="search_ctrl").lower()
-            if search_control:
-                clients_for_control = [c for c in clients_for_control if search_control in c['full_name'].lower() or search_control in c['email'].lower()]
-            
-            for client in clients_for_control:
-                with st.expander(f"👤 {client['full_name']} | ✉️ {client['email']}"):
-                    # 1. Obtener y renderizar la Cuenta
-                    accounts = get_accounts_by_user(client["Id_user"])
-                    accounts = [
-                        acc for acc in accounts
-                        if (acc.get("status_id", acc[4] if isinstance(acc, tuple) else None)) in [1,2,3]
-                        ]
+        tab3_clientes, tab3_personal = st.tabs(["👥 Cuentas de Clientes", "🏢 Cuentas de Personal"])
 
+        def render_account_controls(user_list, search_query_val, is_staff_control=False):
+            if search_query_val:
+                user_list = [c for c in user_list if search_query_val in c['full_name'].lower() or search_query_val in c['email'].lower()]
+            
+            if not user_list:
+                st.info("No hay usuarios en esta categoría.")
+                return
+
+            # --- OPTIMIZATION: BATCH FETCH ALL ACCOUNTS AND CARDS ---
+            u_ids = [u['Id_user'] for u in user_list]
+            all_accounts = get_accounts_by_user_ids(u_ids)
+            
+            # Filter for operational statuses (1,2,3)
+            all_accounts = [acc for acc in all_accounts if (acc.get("status_id", 1)) in [1,2,3]]
+            
+            if not all_accounts and is_staff_control:
+                st.info("No hay personal con cuentas bancarias operativas.")
+                return
+
+            # Batch fetch cards for these accounts
+            acc_ids = [acc['Id_account'] for acc in all_accounts]
+            all_cards = get_cards_by_account_ids(acc_ids) if acc_ids else []
+
+            # Grouping for fast lookup
+            accs_by_user = {}
+            for acc in all_accounts:
+                accs_by_user.setdefault(acc['user_id'], []).append(acc)
+            
+            cards_by_acc = {}
+            for card in all_cards:
+                cards_by_acc.setdefault(card['account_id'], []).append(card)
+
+            prefix = "stf_ctrl" if is_staff_control else "cli_ctrl"
+
+            # If staff controlling, only show who actually has accounts
+            if is_staff_control:
+                user_list = [u for u in user_list if u['Id_user'] in accs_by_user]
+
+            for user in user_list:
+                with st.expander(f"👤 {user['full_name']} | ✉️ {user['email']}"):
+                    user_accounts = accs_by_user.get(user["Id_user"], [])
                     
-                    if not accounts:
-                         st.info("Este cliente aún no tiene cuentas bancarias.")
+                    if not user_accounts:
+                         st.info("Este usuario no tiene cuentas bancarias operativas.")
                          continue
                          
                     st.markdown("#### 🏦 Cuentas Bancarias")
-                    for acc_idx, account in enumerate(accounts):
-                        ac_id = account.get("Id_account", account[0] if isinstance(account, tuple) else None)
-                        if not ac_id: continue
-                        
-                        ac_num = account.get("account_number", account[2] if isinstance(account, tuple) else "N/A")
-                        ac_status = account.get("status_id", account[4] if isinstance(account, tuple) else 1)
+                    for acc_idx, account in enumerate(user_accounts):
+                        ac_id = account['Id_account']
+                        ac_num = account.get("account_number", "N/A")
+                        ac_status = account.get("status_id", 1)
                         
                         col_acc1, col_acc2 = st.columns([2, 1])
                         with col_acc1:
                             st.write(f"**Número de Cuenta:** `{ac_num}`")
-                            st.write(f"**Saldo Actual:** Pendiente a cargar en módulo") # Podriamos cargar el get_balance_from_ledger pero evitamos llamadas excesivas en un loop
+                            st.write(f"**Saldo Actual:** Pendiente")
                         
                         with col_acc2:
                             new_ac_status = st.selectbox(
@@ -393,73 +418,55 @@ if role_id == 3:
                                 options=[1, 2, 3],
                                 format_func=lambda x: "✅ Activa" if x == 1 else ("⚠️ Bloqueada" if x == 2 else "🚫 Suspendida"),
                                 index=[1, 2, 3].index(ac_status) if ac_status in [1,2,3] else 0,
-                                key=f"acc_status_{ac_id}"
+                                key=f"acc_status_{prefix}_{ac_id}"
                             )
                             
                             if new_ac_status != ac_status:
                                 try:
                                      update_account_status(ac_id, new_ac_status)
-                                     log_action(
-                                          st.session_state["user_data"]["Id_user"],
-                                          "CAMBIO_ESTADO_CUENTA",
-                                          f"Admin cambió estado de la cuenta {ac_num} a {new_ac_status}"
-                                          )
-                                     st.success(f"Estado de cuenta {ac_num} actualizado correctamente.")
-                                     time.sleep(1)
-                                     st.rerun()
-                                    
+                                     st.cache_data.clear()
+                                     st.success("Actualizado")
                                 except Exception as e:
-                                    st.error(f"Error: {str(e)}")
+                                    st.error(f"Error: {e}")
                                     
-                        # 2. Obtener y renderizar las Tarjetas de esta cuenta
                         st.markdown(f"**💳 Tarjetas Vinculadas a {ac_num}**")
-                        cards = get_cards_by_account(ac_id)
-                        if cards:
-                            for card in cards:
+                        user_cards = cards_by_acc.get(ac_id, [])
+                        if user_cards:
+                            for card in user_cards:
                                 with st.container(border=True):
                                     c1, c2 = st.columns([3, 1])
                                     with c1:
-                                        # Mostrar últimos 4 dígitos reales del card_number de 16, no la de PIN
                                         last4 = str(card["card_number"])[-4:]
                                         st.write(f"**Tarjeta:** `**** **** **** {last4}`")
                                         exp = card["expiration_date"].strftime("%m/%y") if card["expiration_date"] else "N/A"
                                         st.caption(f"Vence: {exp}")
                                     
                                     with c2:
-                                        # Status Toggle
-                                        toggle_label = "Activa" if card["is_active"] else "Inactiva"
-                                        is_active_new = st.toggle(
-                                            toggle_label,
-                                            value=bool(card["is_active"]),
-                                            key=f"card_toggle_{card['Id_card']}"
-                                        )
-                                        
+                                        is_active_new = st.toggle("Activa", value=bool(card["is_active"]), key=f"card_toggle_{prefix}_{card['Id_card']}")
                                         if is_active_new != bool(card["is_active"]):
                                             try:
                                                 update_card_status(card["Id_card"], is_active_new)
-                                                log_action(
-                                                    st.session_state["user_data"]["Id_user"],
-                                                    "CAMBIO_ESTADO_TARJETA",
-                                                    f"Admin cambió estado de la tarjeta ****{last4} a {'Activa' if is_active_new else 'Inactiva'}"
-                                                    )
-                                                st.toast(f"Estado de la tarjeta ...{last4} cambiado a {'Activa' if is_active_new else 'Inactiva'}", icon="✅")
-                                                time.sleep(1)
-                                                st.rerun()
+                                                st.cache_data.clear()
                                             except Exception as e:
-                                                st.error(f"Error: {str(e)}")
+                                                st.error(f"Error: {e}")
                         else:
-                            st.info("No hay tarjetas vinculadas a esta cuenta.")
-                        
-                        if acc_idx < len(accounts) - 1:
-                            st.divider()
-        else:
-            st.info("No hay clientes registrados en el sistema.")
+                            st.info("No hay tarjetas.")
+                        if acc_idx < len(user_accounts) - 1: st.divider()
 
-    # --- TAB 4: APROBACIONES ($10K+) ---
-    with tab4:
-        st.header("Transacciones Pendientes de Aprobación")
-        st.write("Cualquier movimiento mayor o igual a $10,000 requiere autorización manual.")
+        with tab3_clientes:
+            st.subheader("Control de Cuentas de Clientes Regulares")
+            clients_for_control = cached_get_users(is_staff=False)
+            search_control_cli = st.text_input("🔍 Buscar cliente por nombre o correo", key="search_ctrl_cli").lower()
+            render_account_controls(clients_for_control if clients_for_control else [], search_control_cli, is_staff_control=False)
 
+        with tab3_personal:
+            st.subheader("Control de Cuentas del Personal")
+            staff_for_control = cached_get_users(is_staff=True)
+            search_control_stf = st.text_input("🔍 Buscar personal por nombre o correo", key="search_ctrl_stf").lower()
+            render_account_controls(staff_for_control if staff_for_control else [], search_control_stf, is_staff_control=True)
+
+    @st.cache_data(ttl=60)
+    def get_pending_approvals():
         query = """
             SELECT 
                 t.Id_transaction, t.description, t.transaction_date, 
@@ -471,10 +478,16 @@ if role_id == 3:
             INNER JOIN [user] u ON t.created_by_user_id = u.Id_user
             WHERE t.status_id = 2
         """
-
         with get_cursor() as cursor:
             cursor.execute(query)
-            pendientes = cursor.fetchall()
+            return cursor.fetchall()
+
+    # --- TAB 4: APROBACIONES ($10K+) ---
+    with tab4:
+        st.header("Transacciones Pendientes de Aprobación")
+        st.write("Cualquier movimiento mayor o igual a $10,000 requiere autorización manual.")
+
+        pendientes = get_pending_approvals()
 
         if pendientes:
             for p in pendientes:
@@ -497,18 +510,18 @@ if role_id == 3:
                         col_b1, col_b2 = st.columns(2)
                         st.markdown('<div class="btn-success">', unsafe_allow_html=True)
                         if col_b1.button("✅ Aprobar", key=f"app_{tx_id}", width="stretch", type="primary"):
-                            res = review_transaction(tx_id, st.session_state["user_data"]["Id_user"], True, note)
+                            res = review_transaction(tx_id, st.session_state['user_data']['Id_user'], True, note)
                             if res["success"]:
+                                st.cache_data.clear()
                                 st.success("Aprobada")
-                                st.rerun()
                             else: st.error(res["error"])
                         st.markdown('</div>', unsafe_allow_html=True)
                         st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
                         if col_b2.button("❌ Rechazar", key=f"rej_{tx_id}", width="stretch", type="secondary"):
-                            res = review_transaction(tx_id, st.session_state["user_data"]["Id_user"], False, note)
+                            res = review_transaction(tx_id, st.session_state['user_data']['Id_user'], False, note)
                             if res["success"]:
+                                st.cache_data.clear()
                                 st.warning("Rechazada")
-                                st.rerun()
                             else: st.error(res["error"])
                         st.markdown('</div>', unsafe_allow_html=True)
         else:
