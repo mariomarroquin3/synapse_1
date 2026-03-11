@@ -8,27 +8,26 @@ import calendar
 
 def generate_account_statement_pdf(user_name, account_number, balance, transactions, month=None, year=None):
     buffer = BytesIO()
-    # Aumentamos márgenes laterales para evitar que se vea apretado
     doc = SimpleDocTemplate(buffer, pagesize=LETTER, rightMargin=45, leftMargin=45, topMargin=45, bottomMargin=45)
     styles = getSampleStyleSheet()
     
-    # --- Colores ---
     PRIMARY_COLOR = colors.HexColor("#1e293b")
     SECONDARY_COLOR = colors.HexColor("#64748b")
     BG_LIGHT = colors.HexColor("#f8fafc")
 
-    # --- Estilos corregidos ---
     style_bank_name = ParagraphStyle('bank', fontSize=16, fontName='Helvetica-Bold', textColor=PRIMARY_COLOR, leading=18)
     style_label = ParagraphStyle('label', fontSize=8, textColor=SECONDARY_COLOR, leading=10, spaceAfter=2)
     style_value = ParagraphStyle('value', fontSize=10, fontName='Helvetica-Bold', textColor=PRIMARY_COLOR, leading=12)
     style_header_table = ParagraphStyle('h_table', fontSize=9, fontName='Helvetica-Bold', textColor=colors.white, alignment=TA_LEFT)
     style_cell_left = ParagraphStyle('c_left', fontSize=9, alignment=TA_LEFT, leading=12)
     style_cell_right = ParagraphStyle('c_right', fontSize=9, alignment=TA_RIGHT, leading=12)
+    
+    # Estilo pequeño para la hora
+    style_time = ParagraphStyle('c_time', fontSize=7, textColor=SECONDARY_COLOR, alignment=TA_LEFT, leading=9)
 
     elements = []
 
-    # --- ENCABEZADO MEJORADO (Sin solapamientos) ---
-    # Usamos una sola fila con dos columnas bien definidas
+    # --- ENCABEZADO ---
     header_content_left = [
         Paragraph("BANCO SYNAPSE S.A.", style_bank_name),
         Paragraph("Av. Financiera 123, El Salvador", style_label),
@@ -46,7 +45,7 @@ def generate_account_statement_pdf(user_name, account_number, balance, transacti
     elements.append(header_table)
     elements.append(Spacer(1, 25))
 
-    # --- DATOS DEL CLIENTE (Más espacio entre filas) ---
+    # --- DATOS DEL CLIENTE ---
     client_data = [
         [Paragraph("TITULAR DE LA CUENTA", style_label), Paragraph("NÚMERO DE CUENTA", style_label)],
         [Paragraph(user_name.upper(), style_value), Paragraph(account_number, style_value)]
@@ -61,7 +60,7 @@ def generate_account_statement_pdf(user_name, account_number, balance, transacti
     elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey))
     elements.append(Spacer(1, 20))
 
-    # --- RESUMEN (Ajuste de Padding) ---
+    # --- RESUMEN ---
     total_credits = sum(tx['amount'] for tx in transactions if tx['entry_type'] == 'credit')
     total_debits = sum(tx['amount'] for tx in transactions if tx['entry_type'] == 'debit')
     initial_balance = balance - (total_credits - total_debits)
@@ -89,8 +88,9 @@ def generate_account_statement_pdf(user_name, account_number, balance, transacti
     elements.append(Paragraph("DETALLE DE MOVIMIENTOS", style_value))
     elements.append(Spacer(1, 10))
 
+    # Agregamos la columna "HORA" al encabezado
     data = [[
-        Paragraph("FECHA", style_header_table),
+        Paragraph("FECHA / HORA", style_header_table),
         Paragraph("DESCRIPCIÓN", style_header_table),
         Paragraph("TIPO", style_header_table),
         Paragraph("MONTO", ParagraphStyle('h_right', parent=style_header_table, alignment=TA_RIGHT))
@@ -101,15 +101,25 @@ def generate_account_statement_pdf(user_name, account_number, balance, transacti
         prefix = "+" if tx['entry_type'] == 'credit' else "-"
         amount_text = f"<b><font color='{color}'>{prefix}${tx['amount']:,.2f}</font></b>"
         
+        # Formateamos fecha y hora
+        date_str = tx['date'].strftime("%d/%m/%Y")
+        time_str = tx['date'].strftime("%I:%M %p") # Ejemplo: 02:30 PM
+        
+        # Combinamos fecha y hora en una celda usando Paragraphs apilados
+        date_time_cell = [
+            Paragraph(date_str, style_cell_left),
+            Paragraph(time_str, style_time)
+        ]
+        
         data.append([
-            Paragraph(tx['date'].strftime("%d/%m/%Y"), style_cell_left),
+            date_time_cell,
             Paragraph(tx['description'], style_cell_left),
             Paragraph(tx['type'], style_cell_left),
             Paragraph(amount_text, style_cell_right)
         ])
 
-    # Ajustamos anchos: Descripción más ancha, Fecha y Tipo más estrechos
-    t_mov = Table(data, colWidths=[70, 250, 90, 110])
+    # Reajuste de anchos: La primera columna necesita un poco más para la hora
+    t_mov = Table(data, colWidths=[85, 235, 90, 110])
     t_mov.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), PRIMARY_COLOR),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
