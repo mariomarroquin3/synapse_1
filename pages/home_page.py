@@ -123,6 +123,7 @@ if len(user_accounts) < 5:
     if st.sidebar.button("➕ Abrir Nueva Cuenta", use_container_width=True):
         try:
             create_new_account(user["Id_user"])
+            st.cache_data.clear()
             st.toast("¡Nueva cuenta creada exitosamente!", icon="🎉")
             time.sleep(1)
             # Actualizamos de inmediato el estado global del id para auto seleccionarla, podríamos traerla pero el rerun lo hará
@@ -202,6 +203,7 @@ elif menu == "Transferencias":
                                         time.sleep(3)
                                         st.rerun()
                                     else:
+                                        st.cache_data.clear()
                                         st.success(f"¡Transferencia de ${amount_to_transfer:,.2f} realizada exitosamente!")
                                         st.balloons()
                                         time.sleep(1)
@@ -388,6 +390,7 @@ elif menu == "Mis Tarjetas":
                                 with st.spinner("Procesando pago de renovación..."):
                                     res = request_card_renewal(card_id, account["Id_account"], user["Id_user"])
                                     if res.get("success"):
+                                        st.cache_data.clear()
                                         st.success("¡Pago exitoso! Acuda a una sucursal para finalizar.")
                                         time.sleep(2)
                                         st.rerun()
@@ -498,6 +501,7 @@ elif menu == "Mis Tarjetas":
                                 )
                                 
                                 if result.get("success"):
+                                    st.cache_data.clear()
                                     st.session_state.new_card_data = {
                                         "full_number": full_number,
                                         "pin": result["pin"],
@@ -620,6 +624,7 @@ elif menu == "Pago de Servicios":
                         )
                         
                         if resultado.get("success"):
+                            st.cache_data.clear()
                             st.success(f"¡Pago de ${amount:,.2f} procesado exitosamente!")
                             st.balloons()
                             time.sleep(2)

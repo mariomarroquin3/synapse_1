@@ -1,6 +1,7 @@
 from config.database import get_cursor
 from typing import Any, Dict, Optional
 import datetime
+import streamlit as st
 
 def count_cards_by_account(account_id: int) -> int:
     """Cuenta cuántas tarjetas tiene una cuenta específica."""
@@ -60,6 +61,7 @@ def get_card_by_number(card_number: str):
         cursor.execute(query, (card_number,))
         return cursor.fetchone() # Devuelve la tupla completa o None
     
+@st.cache_data(ttl=60)
 def get_cards_by_account(account_id: int):
     """
     Recupera todas las tarjetas asociadas a una cuenta.

@@ -134,6 +134,25 @@ def get_filtered_approval_history(limit):
     return _fetch_approval_history(limit)
 
 
+@st.cache_data(ttl=60)
+def get_pending_approvals():
+    query = """
+        SELECT 
+            t.Id_transaction, t.description, t.transaction_date, 
+            a.amount, a.from_account_id, a.to_account_id,
+            tt.name AS type_name, u.full_name AS requester
+        FROM (([transaction] t
+        INNER JOIN transaction_approvals a ON t.Id_transaction = a.transaction_id)
+        INNER JOIN transaction_type tt ON t.transaction_type_id = tt.Id_transaction_type)
+        INNER JOIN [user] u ON t.created_by_user_id = u.Id_user
+        WHERE t.status_id = 2
+    """
+    with get_cursor() as cursor:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        return [list(row) for row in rows] if rows else []
+
+
 def _fetch_auditor_admin_logs(limit):
     top_clause = f"TOP {limit}" if limit else ""
     query = f"""
@@ -273,6 +292,7 @@ if role_id == 3:
                         }
                         res = register_user_with_permissions(st.session_state["user_data"]["Id_user"], user_data)
                         if res["success"]:
+                            st.cache_data.clear()
                             st.success(f"Usuario {s_role[1]} creado exitosamente.")
                             st.rerun()
                         else:
@@ -332,6 +352,7 @@ if role_id == 3:
                                   accion,
                                   f"Admin cambió estado del usuario {client['full_name']} ({client['email']})"
                                   )
+                            st.cache_data.clear()
                             st.success(f"Estado de {client['full_name']} actualizado.")
                             time.sleep(1)
                             st.rerun()
@@ -404,6 +425,7 @@ if role_id == 3:
                                           "CAMBIO_ESTADO_CUENTA",
                                           f"Admin cambió estado de la cuenta {ac_num} a {new_ac_status}"
                                           )
+                                     st.cache_data.clear()
                                      st.success(f"Estado de cuenta {ac_num} actualizado correctamente.")
                                      time.sleep(1)
                                      st.rerun()
@@ -442,6 +464,7 @@ if role_id == 3:
                                                     "CAMBIO_ESTADO_TARJETA",
                                                     f"Admin cambió estado de la tarjeta ****{last4} a {'Activa' if is_active_new else 'Inactiva'}"
                                                     )
+                                                st.cache_data.clear()
                                                 st.toast(f"Estado de la tarjeta ...{last4} cambiado a {'Activa' if is_active_new else 'Inactiva'}", icon="✅")
                                                 time.sleep(1)
                                                 st.rerun()
@@ -460,21 +483,7 @@ if role_id == 3:
         st.header("Transacciones Pendientes de Aprobación")
         st.write("Cualquier movimiento mayor o igual a $10,000 requiere autorización manual.")
 
-        query = """
-            SELECT 
-                t.Id_transaction, t.description, t.transaction_date, 
-                a.amount, a.from_account_id, a.to_account_id,
-                tt.name AS type_name, u.full_name AS requester
-            FROM (([transaction] t
-            INNER JOIN transaction_approvals a ON t.Id_transaction = a.transaction_id)
-            INNER JOIN transaction_type tt ON t.transaction_type_id = tt.Id_transaction_type)
-            INNER JOIN [user] u ON t.created_by_user_id = u.Id_user
-            WHERE t.status_id = 2
-        """
-
-        with get_cursor() as cursor:
-            cursor.execute(query)
-            pendientes = cursor.fetchall()
+        pendientes = get_pending_approvals()
 
         if pendientes:
             for p in pendientes:
@@ -499,6 +508,7 @@ if role_id == 3:
                         if col_b1.button("✅ Aprobar", key=f"app_{tx_id}", width="stretch", type="primary"):
                             res = review_transaction(tx_id, st.session_state["user_data"]["Id_user"], True, note)
                             if res["success"]:
+                                st.cache_data.clear()
                                 st.success("Aprobada")
                                 st.rerun()
                             else: st.error(res["error"])
@@ -507,6 +517,7 @@ if role_id == 3:
                         if col_b2.button("❌ Rechazar", key=f"rej_{tx_id}", width="stretch", type="secondary"):
                             res = review_transaction(tx_id, st.session_state["user_data"]["Id_user"], False, note)
                             if res["success"]:
+                                st.cache_data.clear()
                                 st.warning("Rechazada")
                                 st.rerun()
                             else: st.error(res["error"])
@@ -681,6 +692,7 @@ elif role_id == 1:
                     f"Aprobación automática de cuenta {acc['account_number']}"
                 )
 
+            st.cache_data.clear()
             st.success(f"{len(pending_accounts)} cuentas aprobadas automáticamente.")
 
             time.sleep(1)
@@ -719,6 +731,7 @@ elif role_id == 1:
                         
                         approve_account(acc['Id_account'])
 
+                        st.cache_data.clear()
                         st.success("Cuenta aprobada")
 
                         time.sleep(1)
@@ -735,6 +748,7 @@ elif role_id == 1:
                             f"Cajero rechazó la cuenta {acc['account_number']}"
                         )
 
+                        st.cache_data.clear()
                         st.error("Cuenta rechazada")
 
                         time.sleep(1)
@@ -797,6 +811,7 @@ elif role_id == 1:
                                 f"{tx_type} de ${tx_amount} en cuenta {search_acc}"
                             )
 
+                            st.cache_data.clear()
                             st.success(msg)
 
                         else:
