@@ -7,7 +7,6 @@ from config.database import get_connection
 from models.ledger_model import create_ledger_entry, DEBIT, CREDIT
 from datetime import datetime
 from typing import Any
-import streamlit as st
 
 # Tipos de entrada para claridad externa
 ENTRY_DEBIT  = DEBIT
@@ -83,7 +82,6 @@ def _check_account_active(account_id: int, is_debit: bool = True) -> dict:
 # Consulta de Balance
 # ─────────────────────────────────────────────
 
-@st.cache_data(ttl=60)
 def get_account_balance(account_id: int) -> float:
     sql = '''
         SELECT entry_type, SUM(amount)
@@ -428,7 +426,6 @@ def get_account_history_by_type(account_id: int, transaction_type_id: int) -> li
         if cursor: cursor.close()
         if conn: conn.close()
 
-@st.cache_data(ttl=60)
 def get_all_account_history(account_id: int) -> list:
     """
     Obtiene todos los movimientos de una cuenta (Transferencias, Retiros, Depósitos, Pagos).

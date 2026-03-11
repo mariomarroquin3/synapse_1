@@ -4,7 +4,7 @@ from datetime import datetime
 import sys
 import os
 
-# --- 1. CONFIGURACIÓN DE RUTAS (CRÍTICO: ANTES DE LAS IMPORTACIONES LOCALES) ---
+# --- 1. CONFIGURACIÓN DE RUTAS ---
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
@@ -16,9 +16,7 @@ from utils.card_generator import generate_luhn_card_number
 from config.database import get_connection
 from utils.ui_components import apply_premium_style
 from utils.pdf_generator import generate_card_pdf
-# IMPORT DE LA TARJETA AZUL
 from card_print.generate_card_pdf import generate_card_pdf as generate_card_pdf2
-# ESTADO DE CUENTA
 from card_print.user_pdf import generate_account_statement_pdf
 
 # --- 3. CONFIGURACIÓN DE PÁGINA ---
@@ -41,18 +39,12 @@ user_accounts = get_accounts_by_user(user["Id_user"])
 if "active_account_id" not in st.session_state:
     st.session_state["active_account_id"] = user_accounts[0]["Id_account"] if user_accounts else None
 
-# Asegurarse de que el ID activo siga existiendo (por si se eliminó una cuenta, aunque no sucede en nuestro flujo)
 if user_accounts and st.session_state["active_account_id"] not in [acc["Id_account"] for acc in user_accounts]:
      st.session_state["active_account_id"] = user_accounts[0]["Id_account"]
 
-account = {
-    "Id_account": None,
-    "account_number": "Sin cuenta",
-    "currency": "USD"
-}
+account = {"Id_account": None, "account_number": "Sin cuenta", "currency": "USD"}
 
 if user_accounts:
-    # Buscar el row de la cuenta activa
     active_row = next((acc for acc in user_accounts if acc["Id_account"] == st.session_state["active_account_id"]), user_accounts[0])
     try:
         if isinstance(active_row, (list, tuple)):
@@ -70,69 +62,81 @@ if user_accounts:
 else:
     st.warning("⚠️ No tienes cuentas bancarias activas.")
 
-if account.get("status_id") == 2:
-    st.error("⚠️ **Cuenta Bloqueada:** Esta cuenta no admite transacciones de salida de dinero. Por favor verifique con su administrador.")
-elif account.get("status_id") == 3:
-    st.error("🚫 **Cuenta Suspendida:** Esta cuenta ha sido suspendida temporalmente y no puede realizar movimientos.")
-
 # --- FUNCIONES ---
 def logout():
     st.session_state.logged_in = False
     st.session_state.user_data = None
     st.switch_page("pages/login_page.py")
 
-# --- VISTA DE BANCA EN LÍNEA ---
+# --- VISTA DE CABECERA ---
 head_col1, head_col2 = st.columns([3, 1])
 with head_col1:
     st.markdown(f"## Bienvenido, {user.get('full_name', 'Usuario')}")
     dui_display = user.get('DUI', user.get('dui', 'N/A'))
     st.caption(f"DUI: {dui_display} | Cuenta: {account.get('account_number', 'N/A')}")
 with head_col2:
-    st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
     if st.button("Cerrar Sesión", type="secondary"):
         logout()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
 # Menú de Navegación
 menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Pago de Servicios", "Mis Tarjetas", "Historial de Movimientos", "Mi Perfil"])
 
-# --- SELECTOR DE CUENTAS ---
+# --- SELECTOR DE CUENTAS (SIDEBAR) ---
 st.sidebar.divider()
 st.sidebar.markdown("### Mis Cuentas")
 
 if user_accounts:
-    account_options = {acc["Id_account"]: f"{acc.get('account_number')} ({acc.get('currency', 'USD')})" for acc in user_accounts}
+    status_icons = {1: "✅", 2: "🔒", 3: "⏸️", 4: "⏳", 5: "❌"}
+    account_options = {
+        acc["Id_account"]: f"{status_icons.get(acc.get('status_id'), '💳')} {acc.get('account_number')} ({acc.get('currency', 'USD')})" 
+        for acc in user_accounts
+    }
     selected_acc = st.sidebar.selectbox(
         "Cuenta Activa",
         options=list(account_options.keys()),
         format_func=lambda x: account_options[x],
         index=list(account_options.keys()).index(st.session_state["active_account_id"]) if st.session_state["active_account_id"] in account_options else 0
     )
-    
     if selected_acc != st.session_state["active_account_id"]:
         st.session_state["active_account_id"] = selected_acc
         st.rerun()
 
 st.sidebar.divider()
-st.sidebar.markdown("### Configuración")
-
 if len(user_accounts) < 5:
-    st.sidebar.markdown('<div class="btn-success">', unsafe_allow_html=True)
     if st.sidebar.button("➕ Abrir Nueva Cuenta", use_container_width=True):
         try:
             create_new_account(user["Id_user"])
             st.cache_data.clear()
-            st.toast("¡Nueva cuenta creada exitosamente!", icon="🎉")
-            time.sleep(1)
-            # Actualizamos de inmediato el estado global del id para auto seleccionarla, podríamos traerla pero el rerun lo hará
+            st.toast("⏳ Solicitud enviada.", icon="⏳")
+            time.sleep(2)
             st.rerun()
         except Exception as e:
             st.sidebar.error(str(e))
-    st.sidebar.markdown('</div>', unsafe_allow_html=True)
-else:
-    st.sidebar.info("Límite de 5 cuentas alcanzado.")
+
+# ==========================================================
+# --- VALIDACIÓN DE SEGURIDAD (LOGICA ACTUALIZADA) ---
+# ==========================================================
+estado_actual = account.get("status_id", 1)
+
+# A. BLOQUEO TOTAL (Estados: 3, 4, 5)
+# Si está SUSPENDIDA (3), ya no puede hacer nada.
+if estado_actual == 3:
+    st.error("🚫 **Cuenta Suspendida:** Esta cuenta ha sido inhabilitada por el administrador. No se permiten consultas ni movimientos.")
+    st.stop()
+elif estado_actual == 5:
+    st.error("❌ **Cuenta Rechazada:** Esta solicitud no fue aprobada.")
+    st.stop() 
+elif estado_actual == 4:
+    st.warning("⏳ **Cuenta Pendiente:** Esperando aprobación del cajero para habilitar el acceso.")
+    st.stop()
+
+# B. BLOQUEO PARCIAL (Estado: 2)
+# Bloqueada permite ver saldos, pero NO sacar dinero.
+if estado_actual == 2:
+    st.error("⚠️ **Cuenta Bloqueada:** Solo se permiten depósitos entrantes. Las transferencias y pagos están deshabilitados.")
+
 
 # --- BOTÓN DE CAJERO ---
 st.sidebar.divider()
@@ -203,7 +207,6 @@ elif menu == "Transferencias":
                                         time.sleep(3)
                                         st.rerun()
                                     else:
-                                        st.cache_data.clear()
                                         st.success(f"¡Transferencia de ${amount_to_transfer:,.2f} realizada exitosamente!")
                                         st.balloons()
                                         time.sleep(1)
@@ -390,7 +393,6 @@ elif menu == "Mis Tarjetas":
                                 with st.spinner("Procesando pago de renovación..."):
                                     res = request_card_renewal(card_id, account["Id_account"], user["Id_user"])
                                     if res.get("success"):
-                                        st.cache_data.clear()
                                         st.success("¡Pago exitoso! Acuda a una sucursal para finalizar.")
                                         time.sleep(2)
                                         st.rerun()
@@ -501,7 +503,6 @@ elif menu == "Mis Tarjetas":
                                 )
                                 
                                 if result.get("success"):
-                                    st.cache_data.clear()
                                     st.session_state.new_card_data = {
                                         "full_number": full_number,
                                         "pin": result["pin"],
@@ -624,7 +625,6 @@ elif menu == "Pago de Servicios":
                         )
                         
                         if resultado.get("success"):
-                            st.cache_data.clear()
                             st.success(f"¡Pago de ${amount:,.2f} procesado exitosamente!")
                             st.balloons()
                             time.sleep(2)

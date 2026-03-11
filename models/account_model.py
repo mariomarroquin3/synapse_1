@@ -2,7 +2,6 @@ from config.database import get_cursor
 from datetime import datetime
 from typing import Any, Dict, Optional
 import random
-import streamlit as st
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -62,7 +61,6 @@ def get_account_by_user(user_id: int) -> Optional[Dict[str, Any]]:
         return _row_to_dict(cursor, row)
 
 
-@st.cache_data(ttl=60)
 def get_accounts_by_user(user_id: int) -> list:
 
     query = "SELECT * FROM [account] WHERE [user_id] = ?"
@@ -76,7 +74,6 @@ def get_accounts_by_user(user_id: int) -> list:
         return [_row_to_dict(cursor, row) for row in rows] if rows else []
 
 
-@st.cache_data(ttl=60)
 def get_account_by_number(account_number: str) -> Optional[Dict[str, Any]]:
 
     query = "SELECT * FROM [account] WHERE [account_number] = ?"
