@@ -7,7 +7,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
-from models.account_model import get_account_by_user
+from models.account_model import get_accounts_by_user
 from services.transaction_service import create_simple_transaction, ENTRY_CREDIT, ENTRY_DEBIT, get_account_balance
 from utils.ui_components import apply_premium_style
 
@@ -26,31 +26,19 @@ apply_premium_style()
 
 # --- CARGA DE DATOS ---
 user = st.session_state.user_data
-account_row = get_account_by_user(user["Id_user"])
+all_accounts = get_accounts_by_user(user["Id_user"])
+
+active_accounts = []
+for acc in all_accounts:
+    status = acc.get("status_id", acc[4] if isinstance(acc, tuple) else None)
+    if status == 1:
+        active_accounts.append(acc)
 
 # Si no hay datos, detenemos la ejecución con un mensaje claro
-if not account_row:
+if not active_accounts:
     st.error("⚠️ No se encontró una cuenta bancaria activa asociada a tu usuario.")
     if st.button("Volver al Inicio"):
         st.switch_page("pages/home_page.py")
-    st.stop()
-
-# Mapeo universal (Soporta Tuplas/Listas y Diccionarios)
-account = {}
-
-try:
-    if isinstance(account_row, (list, tuple)):
-        # Acceso por índice (Legacy/Tuple)
-        account["Id_account"]     = account_row[0]
-        account["account_number"] = account_row[2]
-        account["currency"]       = account_row[3]
-    elif isinstance(account_row, dict):
-        # Acceso por nombre (Modern/Dict)
-        account["Id_account"]     = account_row.get("Id_account")
-        account["account_number"] = account_row.get("account_number")
-        account["currency"]       = account_row.get("currency")
-except Exception as e:
-    st.error(f"Error técnico al procesar la cuenta: {e}")
     st.stop()
 
 # --- ESTILOS CSS ADICIONALES PARA ATM ---
@@ -110,6 +98,30 @@ def set_quick_amount(val):
 with st.container():
     st.markdown(f"#### Bienvenido, {user['full_name']}")
     
+    if len(active_accounts) > 1:
+        selected_idx = st.selectbox(
+            "🏦 Selecciona tu cuenta a operar:",
+            options=range(len(active_accounts)),
+            format_func=lambda i: f"Cuenta: {active_accounts[i].get('account_number', active_accounts[i][2] if isinstance(active_accounts[i], tuple) else 'N/A')}"
+        )
+        account_row = active_accounts[selected_idx]
+    else:
+        account_row = active_accounts[0]
+
+    account = {}
+    try:
+        if isinstance(account_row, (list, tuple)):
+            account["Id_account"]     = account_row[0]
+            account["account_number"] = account_row[2]
+            account["currency"]       = account_row[3]
+        elif isinstance(account_row, dict):
+            account["Id_account"]     = account_row.get("Id_account")
+            account["account_number"] = account_row.get("account_number")
+            account["currency"]       = account_row.get("currency")
+    except Exception as e:
+        st.error(f"Error técnico al procesar la cuenta: {e}")
+        st.stop()
+
     col_main1, col_main2 = st.columns([1.5, 1])
 
     with col_main1:
