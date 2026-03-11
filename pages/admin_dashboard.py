@@ -655,6 +655,9 @@ elif role_id == 1:
         reject_account,
         get_account_by_number
     )
+    
+    # --- CAMBIO 1: Importamos la función para obtener al usuario por su ID ---
+    from models.user_model import get_user_by_id 
 
     from services.transaction_service import create_simple_transaction
     from models.card_model import get_pending_renewals, finalize_card_renewal
@@ -664,39 +667,28 @@ elif role_id == 1:
 
     # BOTÓN PARA APROBAR TODAS
     if st.button("⚡ Aprobar todas las solicitudes pendientes"):
-
         pending_accounts = get_pending_accounts()
-
         if not pending_accounts:
             st.info("No hay cuentas pendientes para aprobar.")
-
         else:
             for acc in pending_accounts:
-
                 approve_account(acc['Id_account'])
-
                 log_action(
                     st.session_state['user_data']['Id_user'],
                     "APROBAR_CUENTA",
                     f"Aprobación automática de cuenta {acc['account_number']}"
                 )
-
             st.success(f"{len(pending_accounts)} cuentas aprobadas automáticamente.")
-
             time.sleep(1)
-
             st.rerun()
 
     pending_accounts = get_pending_accounts()
 
     if not pending_accounts:
         st.info("No hay solicitudes pendientes.")
-
     else:
         for acc in pending_accounts:
-
             with st.container(border=True):
-
                 c1, c2, c3 = st.columns([2,2,1])
 
                 with c1:
@@ -704,41 +696,37 @@ elif role_id == 1:
                     st.caption(f"ID Cuenta: {acc['Id_account']}")
 
                 with c2:
-                    st.markdown(f"**Usuario ID:** {acc['user_id']}")
-                    st.caption("Estado: Pendiente de aprobación")
+                    # --- CAMBIO 2: Buscamos el nombre del cliente y lo mostramos ---
+                    try:
+                        user_info = get_user_by_id(acc['user_id'])
+                        cliente_nombre = user_info['full_name'] if user_info else "Desconocido"
+                    except Exception:
+                        cliente_nombre = "Error al cargar nombre"
+
+                    st.markdown(f"**Cliente:** {cliente_nombre}")
+                    st.caption(f"Usuario ID: {acc['user_id']} | Estado: Pendiente")
 
                 with c3:
-
                     if st.button("✅ Aprobar", key=f"approve_{acc['Id_account']}"):
-
                         log_action(
                             st.session_state['user_data']['Id_user'],
                             "APROBAR_CUENTA",
                             f"Cajero aprobó la cuenta {acc['account_number']}"
                         )
-                        
                         approve_account(acc['Id_account'])
-
                         st.success("Cuenta aprobada")
-
                         time.sleep(1)
-
                         st.rerun()
 
                     if st.button("❌ Rechazar", key=f"reject_{acc['Id_account']}"):
-
                         reject_account(acc['Id_account'])
-
                         log_action(
                             st.session_state['user_data']['Id_user'],
                             "RECHAZAR_CUENTA",
                             f"Cajero rechazó la cuenta {acc['account_number']}"
                         )
-
                         st.error("Cuenta rechazada")
-
                         time.sleep(1)
-
                         st.rerun()
 
     st.divider()
