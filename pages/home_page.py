@@ -227,40 +227,45 @@ elif menu == "Historial de Movimientos":
         if all_history:
 
             # --- OPCIÓN DE FILTRADO ---
-            st.markdown("### Opciones de Visualización")
+            st.markdown("### 🔍 Opciones de Visualización")
 
-            apply_filter = st.checkbox("Filtrar por mes y año")
+            # Mejora visual 1: Usar un toggle (interruptor) en lugar de un checkbox
+            apply_filter = st.toggle("Activar filtro por fechas")
 
             filtered_history = all_history
 
             if apply_filter:
+                # Mejora visual 2: Un contenedor con borde sutil para agrupar el filtro
+                with st.container(border=True):
+                    
+                    # Importamos explícitamente date y timedelta aquí para evitar errores
+                    from datetime import date, timedelta
+                    
+                    # Definimos por defecto los últimos 30 días hasta hoy
+                    today = date.today()
+                    default_start = today - timedelta(days=30)
 
-                colf1, colf2 = st.columns(2)
-
-                months = {
-                    1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
-                    5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
-                    9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
-                }
-
-                with colf1:
-                    selected_month = st.selectbox(
-                        "Seleccionar Mes",
-                        options=list(months.keys()),
-                        format_func=lambda x: months[x]
+                    # Al no poner min_value ni max_value, el usuario puede elegir CUALQUIER fecha
+                    date_range = st.date_input(
+                        "Selecciona el rango de fechas",
+                        value=(default_start, today),
+                        format="DD/MM/YYYY" # Formato latino amigable
                     )
 
-                with colf2:
-                    years = sorted({tx["date"].year for tx in all_history}, reverse=True)
-                    selected_year = st.selectbox("Seleccionar Año", options=years)
-
-                filtered_history = [
-                    tx for tx in all_history
-                    if tx["date"].month == selected_month and tx["date"].year == selected_year
-                ]
+                    # Streamlit devuelve 1 fecha si el usuario está a medio click, y 2 fechas cuando ya eligió inicio y fin.
+                    if len(date_range) == 2:
+                        start_date, end_date = date_range
+                        
+                        filtered_history = [
+                            tx for tx in all_history
+                            if start_date <= (tx["date"].date() if hasattr(tx["date"], "date") else tx["date"]) <= end_date
+                        ]
+                    else:
+                        st.warning("🗓️ Por favor, selecciona la fecha de fin en el calendario.")
 
             st.divider()
 
+            # --- RENDERIZADO DE MOVIMIENTOS ---
             # Diccionario para nombres amigables
             type_names = {
                 1: "Transferencia",
@@ -276,7 +281,7 @@ elif menu == "Historial de Movimientos":
             def render_transactions(tx_list):
 
                 if not tx_list:
-                    st.info("No hay movimientos en esta categoría.")
+                    st.info("No hay movimientos en este periodo o categoría.")
                     return
 
                 for tx in tx_list:
@@ -529,62 +534,88 @@ elif menu == "Mi Perfil":
         balance_actual = get_account_balance(account["Id_account"])
 
         if all_history:
-            # --- Filtro opcional por mes y año ---
-            use_date_filter = st.checkbox("Filtrar por mes y año", key="profile_pdf_date_filter")
+            # --- Filtro opcional por rango de fechas ---
+            use_date_filter = st.toggle("Activar filtro por fechas para el PDF", key="profile_pdf_date_filter")
             filtered_history = all_history
+            
+            # Variables para el PDF (puedes ajustarlas luego en tu generador de PDF)
             selected_month = None
             selected_year = None
+            
+            # Formateo de texto para mostrar en la interfaz
+            date_range_text = "Historial Completo"
 
             if use_date_filter:
-                months = {1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
-                          5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
-                          9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"}
-                col1, col2 = st.columns(2)
-                with col1:
-                    selected_month = st.selectbox(
-                        "Mes",
-                        options=list(months.keys()),
-                        format_func=lambda x: months[x]
-                    )
-                with col2:
-                    years = sorted({tx["date"].year for tx in all_history}, reverse=True)
-                    selected_year = st.selectbox("Año", options=years)
+                with st.container(border=True):
+                    from datetime import date, timedelta
+                    
+                    today = date.today()
+                    default_start = today - timedelta(days=30)
 
-                filtered_history = [
-                    tx for tx in all_history
-                    if tx["date"].month == selected_month and tx["date"].year == selected_year
-                ]
+                    date_range = st.date_input(
+                        "Selecciona el periodo para el Estado de Cuenta",
+                        value=(default_start, today),
+                        format="DD/MM/YYYY",
+                        key="pdf_date_input"
+                    )
+
+                    if len(date_range) == 2:
+                        start_date, end_date = date_range
+                        
+                        filtered_history = [
+                            tx for tx in all_history
+                            if start_date <= (tx["date"].date() if hasattr(tx["date"], "date") else tx["date"]) <= end_date
+                        ]
+                        
+                        # Guardamos el mes y año de inicio solo por si la función del PDF falla sin ellos
+                        selected_month = start_date.month
+                        selected_year = start_date.year
+                        
+                        date_range_text = f"Del {start_date.strftime('%d/%m/%Y')} al {end_date.strftime('%d/%m/%Y')}"
+                        
+                    else:
+                        st.warning("🗓️ Por favor, selecciona la fecha de fin en el calendario.")
+            
+            # Mostrar al usuario qué va a imprimir
+            st.info(f"Se generará un PDF con: **{date_range_text}** ({len(filtered_history)} movimientos).")
 
             if st.button("📄 Generar Estado de Cuenta PDF"):
-                from card_print.user_pdf import generate_account_statement_pdf
+                
+                # Prevenir la generación si el filtro está a medias
+                if use_date_filter and len(date_range) < 2:
+                    st.error("Debes completar la selección de fechas antes de generar el PDF.")
+                elif not filtered_history:
+                    st.warning("No hay movimientos en el periodo seleccionado para generar el PDF.")
+                else:
+                    from card_print.user_pdf import generate_account_statement_pdf
 
-                pdf_buffer = generate_account_statement_pdf(
-                    user_name=user['full_name'],
-                    account_number=account['account_number'],
-                    balance=balance_actual,
-                    transactions=[
-                        {
-                            "date": tx["date"],
-                            "type": {1:"Transferencia",2:"Retiro",3:"Depósito",4:"Pago"}.get(tx["type_id"], "Otro"),
-                            "description": tx["description"],
-                            "amount": tx["amount"],
-                            "entry_type": tx["entry_type"]  # 'credit' o 'debit'
-                        }
-                        for tx in filtered_history
-                    ],
-                    month=selected_month,
-                    year=selected_year
-                )
-                st.download_button(
-                    label="📥 Descargar PDF",
-                    data=pdf_buffer,
-                    file_name=f"EstadoCuenta_{user['full_name'].replace(' ','_')}.pdf",
-                    mime="application/pdf"
-                )
+                    pdf_buffer = generate_account_statement_pdf(
+                        user_name=user['full_name'],
+                        account_number=account['account_number'],
+                        balance=balance_actual,
+                        transactions=[
+                            {
+                                "date": tx["date"],
+                                "type": {1:"Transferencia",2:"Retiro",3:"Depósito",4:"Pago"}.get(tx["type_id"], "Otro"),
+                                "description": tx["description"],
+                                "amount": tx["amount"],
+                                "entry_type": tx["entry_type"]
+                            }
+                            for tx in filtered_history
+                        ],
+                        date_range_text=date_range_text 
+                    )
+
+                    st.download_button(
+                        label="📥 Descargar PDF",
+                        data=pdf_buffer,
+                        file_name=f"EstadoCuenta_{user['full_name'].replace(' ','_')}.pdf",
+                        mime="application/pdf"
+                    )
         else:
             st.info("No hay movimientos registrados para esta cuenta.")
     else:
-        st.warning("No tienes una cuenta asociada para generar el estado de cuenta.")                                  
+        st.warning("No tienes una cuenta asociada para generar el estado de cuenta.")                                 
 
 elif menu == "Pago de Servicios":
     st.subheader("Pago de Servicios con Tarjeta")
