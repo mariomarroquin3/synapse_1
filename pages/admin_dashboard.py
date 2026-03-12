@@ -193,7 +193,7 @@ def get_filtered_auditor_transactions(limit):
     return _fetch_auditor_transactions(limit)
 
 if role_id == 3:
-    total_clients, pending_count, staff_count = get_admin_kpis()
+    total_clients, pending, staff_count = get_admin_kpis()
 
 # --- CABECERA Y MÉTRICAS ---
 col_h1, col_h2 = st.columns([2, 1])
@@ -217,7 +217,7 @@ if role_id == 3:
             st.metric("👥 Clientes Totales", f"{total_clients}", help="Usuarios registrados con rol de Cliente")
     with col_m2:
         with st.container(border=True):
-            st.metric("⏳ Aprobaciones Pendientes", f"{pending_count}", delta=f"{pending_count} TX", delta_color="inverse")
+            st.metric("⏳ Aprobaciones Pendientes", f"{pending}", delta=f"{pending} TX", delta_color="inverse")
     with col_m3:
         with st.container(border=True):
             st.metric("🏢 Personal Synapse", f"{staff_count}")
