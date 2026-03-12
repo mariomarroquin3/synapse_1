@@ -4,9 +4,8 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from io import BytesIO
-import calendar
 
-def generate_account_statement_pdf(user_name, account_number, balance, transactions, month=None, year=None):
+def generate_account_statement_pdf(user_name, account_number, balance, transactions, date_range_text="Historial Completo"):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=LETTER, rightMargin=45, leftMargin=45, topMargin=45, bottomMargin=45)
     styles = getSampleStyleSheet()
@@ -36,7 +35,8 @@ def generate_account_statement_pdf(user_name, account_number, balance, transacti
     
     header_content_right = [
         Paragraph("ESTADO DE CUENTA", ParagraphStyle('est', fontSize=14, alignment=TA_RIGHT, fontName='Helvetica-Bold', leading=16)),
-        Paragraph(f"Periodo: {calendar.month_name[month] if month else 'Marzo'} {year if year else '2026'}", 
+        #  Imprimimos exactamente el texto del rango de fechas
+        Paragraph(f"Periodo: {date_range_text}", 
                   ParagraphStyle('per', alignment=TA_RIGHT, fontSize=9, textColor=SECONDARY_COLOR))
     ]
 

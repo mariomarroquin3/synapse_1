@@ -68,7 +68,7 @@ def get_clean_name(text):
 
 # --- RENDERIZADO DE UI ---
 st.markdown('<div class="hero-section">', unsafe_allow_html=True)
-st.markdown('<h1 class="brand-title">Synapse</h1>', unsafe_allow_html=True)
+st.markdown('<h1 class="brand-title">Synapse Iduna</h1>', unsafe_allow_html=True)
 st.markdown('<p class="brand-sub">Banca Digital • El Salvador</p>', unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
