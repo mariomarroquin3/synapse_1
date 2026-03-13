@@ -78,12 +78,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- VISTA DE CAJERO AUTOMÁTICO ---
-st.title("🏧 Synapse ATM 2.0")
-
 # --- INITIALIZE STATE ---
 if 'atm_amount' not in st.session_state:
     st.session_state.atm_amount = ""
+    
+# Estado para saber si estamos mostrando un recibo
+if 'receipt_data' not in st.session_state:
+    st.session_state.receipt_data = None
 
 def add_digit(digit):
     st.session_state.atm_amount += str(digit)
@@ -94,7 +95,56 @@ def clear_amount():
 def set_quick_amount(val):
     st.session_state.atm_amount = str(val)
 
-# --- ATM CONTAINER ---
+
+# --- VISTA DE CAJERO AUTOMÁTICO ---
+st.title("🏧 Synapse ATM 2.0")
+
+# 1. SI HAY UN RECIBO EN MEMORIA, MOSTRARLO Y DETENER LA APP (Bloquea el cajero)
+if st.session_state.receipt_data:
+    recibo = st.session_state.receipt_data
+    
+    st.success("¡Transacción Exitosa!")
+    st.markdown("### 📄 Tu Recibo")
+    
+    with st.container(border=True):
+        st.markdown(f"""
+            **SYNAPSE ATM RECEIPT**
+            - **Fecha:** {recibo['fecha']}
+            - **Operación:** {recibo['operacion']}
+            - **Monto:** ${recibo['monto']:,.2f}
+            - **Estado:** {recibo['estado']}
+            - **Referencia:** {recibo['referencia']}
+        """)
+        
+        st.divider()
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            try:
+                from card_print.factura_pdf import generar_recibo_pdf 
+                pdf_buffer = generar_recibo_pdf(recibo)
+                
+                st.download_button(
+                    label="📥 Descargar Factura (PDF)",
+                    data=pdf_buffer,
+                    file_name=f"Recibo_ATM_{recibo['referencia']}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"Error cargando PDF: {e}")
+                
+        with col2:
+            if st.button("❌ Finalizar y Cerrar", type="primary", use_container_width=True):
+                # Limpiamos la memoria para volver al cajero
+                st.session_state.receipt_data = None
+                st.rerun()
+                
+    # st.stop() hace que el teclado numérico no se dibuje abajo del recibo
+    st.stop()
+
+
+# 2. SI NO HAY RECIBO, CONTINÚA CON EL CAJERO NORMAL...
 with st.container():
     st.markdown(f"#### Bienvenido, {user['full_name']}")
     
@@ -204,23 +254,21 @@ with st.container():
                         )
                         
                         if result.get("success"):
-                            st.success(f"✅ {operation} de ${final_amount:,.2f} procesado con éxito.")
                             st.balloons()
                             
-                            # Mostrar "Recibo"
-                            with st.expander("📄 Ver Recibo de Transacción", expanded=True):
-                                st.markdown(f"""
-                                    **SYNAPSE ATM RECEIPT**
-                                    - **Fecha:** {time.strftime("%Y-%m-%d %H:%M:%S")}
-                                    - **Operación:** {operation}
-                                    - **Monto:** ${final_amount:,.2f}
-                                    - **Estado:** {'PENDIENTE DE APROBACIÓN' if result.get('requires_approval') else 'EXITOSO'}
-                                    - **Referencia:** {result.get('transaction_id')}
-                                """)
+                            # Guardamos todos los datos del recibo en sesión
+                            st.session_state.receipt_data = {
+                                "fecha": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                "operacion": operation,
+                                "monto": final_amount,
+                                "estado": 'PENDIENTE DE APROBACIÓN' if result.get('requires_approval') else 'EXITOSO',
+                                "referencia": result.get('transaction_id', 'REF-0000'),
+                                "usuario": user['full_name'],
+                                "cuenta": account['account_number']
+                            }
                             
                             clear_amount()
-                            time.sleep(3)
-                            st.rerun()
+                            st.rerun() # Recarga la app para que entre en la pantalla del recibo
                         else:
                             st.error(f"Error: {result.get('error')}")
         except ValueError:
