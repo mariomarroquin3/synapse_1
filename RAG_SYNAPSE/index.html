@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soporte SYNAPSE</title>
+
+<style>
+/* ===== PALETA DE COLORES PREMIUM (MODO OSCURO) ===== */
+:root {
+    --bg-sidebar: #0f111a;
+    --bg-main: rgba(26, 29, 39, 0.85); /* Fondo base más transparente */
+    --bg-input: #232736;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --border: #2e3344;
+    --danger: #e11d48;
+    --user-msg: linear-gradient(135deg, #6366f1, #8b5cf6);
+    --rag-msg: rgba(40, 44, 62, 0.85); /* Ligeramente translúcido para que luzca el fondo */
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+    font-family: "Segoe UI", Roboto, Helvetica, sans-serif;
+    height: 100vh;
+    display: flex;
+    background-color: #000; /* Fondo negro por si la imagen tarda en cargar */
+    color: var(--text-main);
+    overflow: hidden;
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+
+@keyframes bounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+    width: 280px;
+    background: var(--bg-sidebar);
+    display: flex;
+    flex-direction: column;
+    padding: 15px 10px;
+    border-right: 1px solid var(--border);
+    box-shadow: 2px 0 15px rgba(0,0,0,0.5);
+    z-index: 10;
+    transition: all 0.3s ease;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    font-size: 1.1em;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.logo img {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    padding: 2px;
+    transition: transform 0.3s ease;
+}
+.logo:hover img { transform: rotate(-10deg) scale(1.1); }
+
+.new-chat {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin: 5px 10px 15px 10px;
+    font-weight: 600;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+.new-chat:hover {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(99, 102, 241, 0.4);
+}
+
+.clear-all {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 10px;
+    margin: 5px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s;
+}
+.clear-all:hover {
+    background: rgba(225, 29, 72, 0.1);
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.section { margin-top: 15px; }
+
+.section h4 {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    margin: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.chat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9em;
+    color: var(--text-main);
+    transition: all 0.2s;
+    margin: 2px 0;
+}
+.chat-item:hover { background: rgba(255,255,255,0.05); transform: translateX(5px); }
+
+.chat-item span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-width: 170px;
+}
+
+.delete-chat {
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    transition: color 0.2s;
+}
+.delete-chat:hover { color: var(--danger); transform: scale(1.2); }
+
+/* ===== CHAT (CON FONDO DE IMAGEN) ===== */
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    
+    /* MAGIA DEL FONDO AQUÍ: Mezclamos un color oscuro translúcido con tu imagen */
+    background: linear-gradient(rgba(26, 29, 39, 0.88), rgba(26, 29, 39, 0.95)), url('fondo-synapse.png') center/cover no-repeat;
+}
+
+.chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 40px 15%;
+    scroll-behavior: smooth;
+}
+
+.chat-area::-webkit-scrollbar { width: 8px; }
+.chat-area::-webkit-scrollbar-track { background: transparent; }
+.chat-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.message {
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    line-height: 1.5;
+    font-size: 0.95em;
+    max-width: 85%;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2); /* Sombra más fuerte para que resalte del fondo */
+    animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+    backdrop-filter: blur(5px); /* Efecto cristal para los mensajes */
+}
+
+.user {
+    background: var(--user-msg);
+    color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 2px;
+}
+
+.rag {
+    background: var(--rag-msg);
+    color: var(--text-main);
+    margin-right: auto;
+    border-bottom-left-radius: 2px;
+    border: 1px solid rgba(255,255,255,0.05); /* Borde más sutil */
+}
+
+.instructions {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: rgba(255,255,255,0.7);
+    width: 100%;
+    transition: opacity 0.3s ease;
+}
+.instructions h2 {
+    font-size: 2em;
+    color: #fff;
+    margin-bottom: 10px;
+    font-weight: 600;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5); /* Sombra para que se lea sobre el fondo */
+}
+
+/* Indicador de escribiendo animado */
+.typing-indicator span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--accent);
+    border-radius: 50%;
+    margin: 0 2px;
+    animation: bounce 1.4s infinite ease-in-out both;
+}
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+/* ===== INPUT ===== */
+.input-zone {
+    padding: 20px 15%;
+    /* Degradado hacia la base para que la caja de texto no flote raro sobre la imagen */
+    background: linear-gradient(transparent, rgba(15, 17, 26, 0.95) 30%);
+    padding-bottom: 30px;
+}
+
+.input-wrapper {
+    display: flex;
+    gap: 12px;
+    background: var(--bg-input);
+    padding: 10px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.4);
+    transition: border-color 0.3s, box-shadow 0.3s;
+    backdrop-filter: blur(10px); /* Efecto cristal */
+}
+.input-wrapper:focus-within { 
+    border-color: var(--accent); 
+    box-shadow: 0 5px 25px rgba(99, 102, 241, 0.25);
+}
+
+textarea {
+    flex: 1;
+    resize: none;
+    padding: 10px 5px;
+    background: transparent;
+    border: none;
+    color: var(--text-main);
+    font-size: 1em;
+    font-family: inherit;
+}
+textarea:focus { outline: none; }
+textarea::placeholder { color: var(--text-muted); }
+
+#send-btn {
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#send-btn:hover { 
+    background: var(--accent-hover); 
+    transform: scale(1.05); 
+    animation: pulse 1s infinite;
+}
+
+.cmd-badge {
+    display: inline-block;
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.8em;
+    margin-right: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+    <div class="logo">
+        <img src="logo.png.png" alt="Synapse Logo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'%236366f1\'><path d=\'M12 2L2 22h20L12 2zm0 4.5l6.5 13.5h-13L12 6.5z\'/></svg>'">
+        SYNAPSE IA
+    </div>
+
+    <button class="new-chat" onclick="newChat()">➕ Nuevo Caso</button>
+    <button class="clear-all" onclick="clearAllChats()">🧹 Borrar Historial</button>
+
+    <div class="section">
+        <h4>CASOS RECIENTES</h4>
+        <div id="chat-history"></div>
+    </div>
+
+    <div class="section" style="margin-top: auto;">
+        <h4>AYUDA & COMANDOS</h4>
+        <div class="chat-item" onclick="toggleHelp()">ℹ Ver comandos disponibles</div>
+        <div id="help" style="display:none; padding-left:15px; font-size:.85em; color:var(--text-muted); line-height:1.8; margin-top:5px;">
+            <p><span class="cmd-badge">/nuevo</span> Inicia nuevo caso</p>
+            <p><span class="cmd-badge">/limpiar</span> Borra todo el historial</p>
+            <p><span class="cmd-badge">/ayuda</span> Muestra este menú</p>
+            <p style="margin-top:5px; border-top:1px solid var(--border); padding-top:5px;">
+                • <b>ENTER:</b> Enviar mensaje<br>
+                • <b>SHIFT+ENTER:</b> Salto de línea
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="chat-area" id="chat"></div>
+
+    <div class="instructions" id="intro">
+        <h2>Asistente Synapse</h2>
+        <p>¿En qué puedo ayudarte con los manuales del banco hoy?</p>
+        <p style="font-size: 0.8em; margin-top: 15px; color: #a5b4fc;">Prueba escribir <b>/ayuda</b> en el chat</p>
+    </div>
+
+    <div class="input-zone">
+        <div class="input-wrapper">
+            <textarea id="input" rows="1"
+            placeholder="Escribe tu consulta o usa '/' para comandos..."
+            onkeydown="handleKey(event)"></textarea>
+            <button id="send-btn" onclick="send()">➤</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const API="http://127.0.0.1:8000/ask";
+const chat=document.getElementById("chat");
+const input=document.getElementById("input");
+const intro=document.getElementById("intro");
+const historyBox=document.getElementById("chat-history");
+
+let chats=JSON.parse(localStorage.getItem("chats"))||[];
+let currentChatId=null;
+
+/* Ajuste automático de altura del textarea */
+input.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight <= 120 ? this.scrollHeight : 120) + 'px';
+});
+
+/* ===== CHAT CONTROL ===== */
+function newChat(){
+    currentChatId="chat_"+Date.now();
+    chats.unshift({id:currentChatId,title:"Nueva consulta",messages:[]});
+    saveChats(); renderHistory();
+    chat.innerHTML="";
+    intro.style.display="block";
+    intro.style.opacity = 1;
+    input.style.height = 'auto';
+    input.focus();
+}
+
+function handleKey(e){
+    if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}
+}
+
+function addMessage(role,text,store=true){
+    intro.style.opacity = 0;
+    setTimeout(() => intro.style.display="none", 300);
+
+    const div=document.createElement("div");
+    div.className=`message ${role}`;
+    div.innerText=text; 
+    chat.appendChild(div);
+    chat.scrollTop=chat.scrollHeight;
+    if(store) saveMessage(role,text);
+}
+
+/* ===== LOGICA DE COMANDOS ===== */
+function processCommand(cmd) {
+    const command = cmd.toLowerCase();
+    if (command === "/nuevo") {
+        newChat(); return true;
+    } else if (command === "/limpiar") {
+        clearAllChats(); return true;
+    } else if (command === "/ayuda") {
+        addMessage("rag", "🤖 Comandos disponibles:\n\n/nuevo - Iniciar una nueva conversación\n/limpiar - Borrar todo el historial guardado\n/ayuda - Mostrar esta lista de comandos", false);
+        return true;
+    }
+    return false; 
+}
+
+/* ===== STORAGE ===== */
+function saveMessage(role,text){
+    const c=chats.find(c=>c.id===currentChatId);
+    if(!c) return;
+    c.messages.push({role,content:text});
+    if(role==="user"&&c.title==="Nueva consulta"){
+        c.title=text.slice(0,30) + (text.length > 30 ? '...' : '');
+    }
+    saveChats(); renderHistory();
+}
+
+function saveChats(){localStorage.setItem("chats",JSON.stringify(chats));}
+
+function renderHistory(){
+    historyBox.innerHTML="";
+    chats.forEach(c=>{
+        const row=document.createElement("div");
+        row.className="chat-item";
+
+        const title=document.createElement("span");
+        title.textContent=c.title;
+        title.onclick=()=>loadChat(c.id);
+
+        const del=document.createElement("span");
+        del.className="delete-chat";
+        del.textContent="✖";
+        del.title="Eliminar consulta";
+        del.onclick=(e)=>{
+            e.stopPropagation();
+            deleteChat(c.id);
+        };
+
+        row.appendChild(title);
+        row.appendChild(del);
+        historyBox.appendChild(row);
+    });
+}
+
+function loadChat(id){
+    const c=chats.find(c=>c.id===id);
+    if(!c) return;
+    currentChatId=id;
+    chat.innerHTML="";
+    if(c.messages.length===0){
+        intro.style.display="block";
+        intro.style.opacity = 1;
+    }else{
+        intro.style.display="none";
+        c.messages.forEach(m=>addMessage(m.role,m.content,false));
+    }
+}
+
+function deleteChat(id){
+    if(!confirm("¿Eliminar esta conversación?")) return;
+    chats=chats.filter(c=>c.id!==id);
+    saveChats(); renderHistory();
+    if(currentChatId===id){
+        chats.length?loadChat(chats[0].id):newChat();
+    }
+}
+
+function clearAllChats(){
+    if(!confirm("¿Estás seguro de eliminar TODO el historial?")) return;
+    chats=[]; saveChats(); newChat();
+}
+
+/* ===== RAG ===== */
+async function send(){
+    const q=input.value.trim();
+    if(!q) return;
+    
+    input.value="";
+    input.style.height = 'auto';
+
+    if (q.startsWith('/')) {
+        addMessage("user", q, false);
+        const isCommand = processCommand(q);
+        if (isCommand) return; 
+    }
+
+    addMessage("user",q);
+    
+    const thinkingId = "think_" + Date.now();
+    const div=document.createElement("div");
+    div.className="message rag typing-indicator";
+    div.id=thinkingId;
+    div.innerHTML="Buscando en manuales <span></span><span></span><span></span>";
+    chat.appendChild(div);
+    chat.scrollTop=chat.scrollHeight;
+
+    try{
+        const r=await fetch(API,{
+            method:"POST",
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({query:q})
+        });
+        const d=await r.json();
+        document.getElementById(thinkingId).remove();
+        addMessage("rag",d.response);
+    }catch{
+        document.getElementById(thinkingId).remove();
+        addMessage("rag","❌ Error de conexión con el servidor RAG.");
+    }
+}
+
+function toggleHelp(){
+    const h=document.getElementById("help");
+    h.style.display=h.style.display==="none"?"block":"none";
+}
+
+/* INIT */
+chats.length?loadChat(chats[0].id):newChat();
+</script>
+
+</body>
+</html>

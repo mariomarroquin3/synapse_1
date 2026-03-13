@@ -1,0 +1,470 @@
+[
+  {
+    "id": "login_001",
+    "categoria": "login",
+    "titulo": "Pestaña: ACCESO",
+    "contenido": "Primera pestaña en la página de login. Aquí ingresas tu email y contraseña para acceder a tu cuenta Synapse."
+  },
+  {
+    "id": "login_002",
+    "categoria": "login",
+    "titulo": "Pestaña: REGISTRO",
+    "contenido": "Segunda pestaña en la página de login. Aquí puedes crear una nueva cuenta completando tu nombre, email, DUI, teléfono, contraseña y género."
+  },
+  {
+    "id": "btn_entrar",
+    "categoria": "login",
+    "titulo": "Botón: ENTRAR AL PORTAL",
+    "contenido": "Botón para iniciar sesión. Valida tu email y contraseña. Si son correctos, te lleva al dashboard principal."
+  },
+  {
+    "id": "btn_registrar",
+    "categoria": "login",
+    "titulo": "Botón: REGISTRARME AHORA",
+    "contenido": "Botón para crear una nueva cuenta. Valida todos los datos y crea automáticamente tu primera cuenta en USD."
+  },
+  {
+    "id": "home_header",
+    "categoria": "home",
+    "titulo": "Encabezado del Dashboard",
+    "contenido": "Muestra 'Bienvenido, {tu nombre}' con tu DUI y número de cuenta actual."
+  },
+  {
+    "id": "btn_logout",
+    "categoria": "home",
+    "titulo": "Botón: Cerrar Sesión",
+    "contenido": "Botón en la esquina superior derecha. Al hacer clic, cierras tu sesión y vuelves a la página de login."
+  },
+  {
+    "id": "menu_principal",
+    "categoria": "home_sidebar",
+    "titulo": "Menú Principal",
+    "contenido": "En el sidebar hay 6 opciones: Resumen, Transferencias, Pago de Servicios, Mis Tarjetas, Historial de Movimientos, Mi Perfil."
+  },
+  {
+    "id": "selector_cuenta",
+    "categoria": "home_sidebar",
+    "titulo": "Selector: Cuenta Activa",
+    "contenido": "Dropdown en el sidebar que muestra todas tus cuentas. Al seleccionar una, todo el dashboard se actualiza con los datos de esa cuenta."
+  },
+  {
+    "id": "btn_nueva_cuenta",
+    "categoria": "home_sidebar",
+    "titulo": "Botón: Abrir Nueva Cuenta",
+    "contenido": "Botón verde en el sidebar. Al hacer clic, crea una nueva cuenta en USD. Puedes tener hasta 5 cuentas simultáneamente."
+  },
+  {
+    "id": "btn_cajero",
+    "categoria": "home_sidebar",
+    "titulo": "Botón: CAJERO",
+    "contenido": "Botón azul en el sidebar. Te lleva a una página con un simulador de ATM para practicar retiros y depósitos virtuales."
+  },
+  {
+    "id": "menu_resumen",
+    "categoria": "home",
+    "titulo": "Menú: Resumen",
+    "contenido": "Muestra dos tarjetas: Saldo Disponible (dinero actual en tu cuenta en USD) y Puntos Synapse (500 puntos)."
+  },
+  {
+    "id": "menu_transferencias",
+    "categoria": "home",
+    "titulo": "Menú: Transferencias",
+    "contenido": "Aquí puedes enviar dinero a otras cuentas Synapse. Necesitas: número de cuenta destino, monto, y descripción."
+  },
+  {
+    "id": "field_cuenta_destino",
+    "categoria": "transferencias",
+    "titulo": "Campo: Número de Cuenta Destino",
+    "contenido": "Ingresa el número de la cuenta a la que quieres enviar dinero. Debe empezar con SV_synapse."
+  },
+  {
+    "id": "field_monto",
+    "categoria": "transferencias",
+    "titulo": "Campo: Monto a Transferir",
+    "contenido": "Ingresa cuánto dinero deseas enviar. El sistema valida que tengas fondos suficientes."
+  },
+  {
+    "id": "field_descripcion",
+    "categoria": "transferencias",
+    "titulo": "Campo: Concepto/Descripción",
+    "contenido": "Ingresa por qué estás haciendo la transferencia (ej. 'Pago de almuerzo'). Esto aparecerá en el historial."
+  },
+  {
+    "id": "btn_transferir",
+    "categoria": "transferencias",
+    "titulo": "Botón: Realizar Transferencia",
+    "contenido": "Botón para procesar la transferencia. Valida que la cuenta exista, que tengas dinero suficiente, y que no sea tu propia cuenta."
+  },
+  {
+    "id": "menu_tarjetas",
+    "categoria": "home",
+    "titulo": "Menú: Mis Tarjetas",
+    "contenido": "Muestra todas tus tarjetas de débito. Para cada una ves el número (parcialmente enmascarado), fecha de expiración, estado, y opciones para generar PDF o cambiar estado."
+  },
+  {
+    "id": "btn_generar_pdf",
+    "categoria": "tarjetas",
+    "titulo": "Botón: Generar PDF",
+    "contenido": "Genera un documento PDF con la representación visual de tu tarjeta de débito."
+  },
+  {
+    "id": "btn_activar_desactivar",
+    "categoria": "tarjetas",
+    "titulo": "Botón: Activar/Desactivar Tarjeta",
+    "contenido": "Cambia el estado de tu tarjeta entre activa e inactiva en el sistema."
+  },
+  {
+    "id": "menu_historial",
+    "categoria": "home",
+    "titulo": "Menú: Historial de Movimientos",
+    "contenido": "Muestra una tabla con todas tus transacciones: fecha, descripción, monto, tipo (entrada/salida), y saldo acumulado."
+  },
+  {
+    "id": "menu_pagos",
+    "categoria": "home",
+    "titulo": "Menú: Pago de Servicios",
+    "contenido": "Aquí puedes realizar pagos en línea de forma rápida y segura utilizando tu tarjeta de débito."
+  },
+  {
+    "id": "menu_perfil",
+    "categoria": "home",
+    "titulo": "Menú: Mi Perfil",
+    "contenido": "Muestra tus datos personales: nombre, email, DUI, teléfono, género. También puedes cambiar tu contraseña."
+  },
+  {
+    "id": "atm_title",
+    "categoria": "atm",
+    "titulo": "Página: ATM Simulator",
+    "contenido": "Simulador de cajero automático. Muestra tu saldo actual, cuenta, y te permite practicar retiros y depósitos virtuales."
+  },
+  {
+    "id": "atm_selector_operacion",
+    "categoria": "atm",
+    "titulo": "Selector: Tipo de Operación",
+    "contenido": "Dropdown para elegir entre 'Retiro' o 'Depósito'."
+  },
+  {
+    "id": "atm_teclado",
+    "categoria": "atm",
+    "titulo": "Teclado Numérico",
+    "contenido": "Teclado con botones 0-9, punto decimal, y botón C para limpiar. Ingresas el monto que deseas."
+  },
+  {
+    "id": "atm_montos_rapidos",
+    "categoria": "atm",
+    "titulo": "Montos Rápidos",
+    "contenido": "Botones precargados: $20, $50, $100, $500. Al hacer clic, establece ese monto automáticamente."
+  },
+  {
+    "id": "atm_btn_confirmar",
+    "categoria": "atm",
+    "titulo": "Botón: Confirmar Retiro/Depósito",
+    "contenido": "Procesa la operación virtual. Valida que tengas fondos suficientes (si es retiro) y muestra un recibo."
+  },
+  {
+    "id": "login_paso1",
+    "categoria": "primeros_pasos",
+    "titulo": "Paso 1: Registrarse",
+    "contenido": "Ve a la página de login, haz clic en 'REGISTRO', completa el formulario con tu información, y haz clic en 'REGISTRARME AHORA'."
+  },
+  {
+    "id": "login_paso2",
+    "categoria": "primeros_pasos",
+    "titulo": "Paso 2: Iniciar Sesión",
+    "contenido": "En la pestaña 'ACCESO', ingresa tu email y contraseña, luego haz clic en 'ENTRAR AL PORTAL'."
+  },
+  {
+    "id": "tarjeta_que_es",
+    "categoria": "tarjetas",
+    "titulo": "¿Qué es mi Tarjeta de Débito?",
+    "contenido": "Es una tarjeta virtual que se crea automáticamente cuando abres tu cuenta. Se vincula a tu cuenta en USD y está protegida con autenticación."
+  },
+  {
+    "id": "tarjeta_datos",
+    "categoria": "tarjetas",
+    "titulo": "Datos de mi Tarjeta",
+    "contenido": "En 'Mis Tarjetas' puedes ver: número (parcialmente enmascarado), fecha de expiración, CVV, y estado (activa/inactiva)."
+  },
+  {
+    "id": "transferencia_como",
+    "categoria": "transferencias",
+    "titulo": "¿Cómo Hacer una Transferencia?",
+    "contenido": "Ve a 'Transferencias', ingresa la cuenta destino, el monto, y una descripción. El sistema valida los datos y procesa la transferencia."
+  },
+  {
+    "id": "transferencia_que_pasa",
+    "categoria": "transferencias",
+    "titulo": "¿Qué Pasa con mi Transferencia?",
+    "contenido": "Si el monto es pequeño, se procesa al instante. Si es grande o sospechosa, se queda pendiente de aprobación administrativa."
+  },
+  {
+    "id": "saldo_ver",
+    "categoria": "saldo",
+    "titulo": "¿Cómo Ver mi Saldo?",
+    "contenido": "Ve a 'Resumen' en el menú. Verás una tarjeta que muestra tu saldo disponible en USD."
+  },
+  {
+    "id": "historial_ver",
+    "categoria": "historial",
+    "titulo": "¿Cómo Ver mis Movimientos?",
+    "contenido": "Ve a 'Historial de Movimientos' en el menú. Verás una tabla con todas tus transacciones."
+  },
+  {
+    "id": "perfil_cambiar_contrasena",
+    "categoria": "perfil",
+    "titulo": "¿Cómo Cambiar mi Contraseña?",
+    "contenido": "Ve a 'Mi Perfil', busca la opción 'Cambiar Contraseña', ingresa la contraseña actual y la nueva (dos veces)."
+  },
+  {
+    "id": "cuentas_multiples",
+    "categoria": "cuentas",
+    "titulo": "¿Puedo Tener Varias Cuentas?",
+    "contenido": "Sí, puedes tener hasta 5 cuentas. Cada una es independiente. Ve a 'Abrir Nueva Cuenta' en el sidebar para crear una."
+  },
+  {
+    "id": "cuentas_cambiar",
+    "categoria": "cuentas",
+    "titulo": "¿Cómo Cambio Entre Cuentas?",
+    "contenido": "En el sidebar, usa el selector 'Cuenta Activa' para elegir cuál cuenta quieres usar. Todo el dashboard se actualiza."
+  },
+  {
+    "id": "transferencia_propia",
+    "categoria": "transferencias",
+    "titulo": "¿Puedo Transferir a mis Propias Cuentas?",
+    "contenido": "Sí. Usa el menú 'Transferencias' e ingresa el número de una de tus otras cuentas. No hay comisión."
+  },
+  {
+    "id": "seguridad_contrasena",
+    "categoria": "seguridad",
+    "titulo": "Protege tu Contraseña",
+    "contenido": "Nunca compartas tu contraseña. Synapse no te la pedirá por email o teléfono. Cambia tu contraseña regularmente."
+  },
+  {
+    "id": "seguridad_sesion",
+    "categoria": "seguridad",
+    "titulo": "Cierra tu Sesión",
+    "contenido": "Siempre cierra sesión cuando termines. Especialmente si estás en una computadora compartida. Usa el botón 'Cerrar Sesión'."
+  },
+  {
+    "id": "tarjeta_seguridad",
+    "categoria": "seguridad",
+    "titulo": "Protege tus Datos de Tarjeta",
+    "contenido": "Tu tarjeta está protegida en el sistema. Solo tú puedes ver los datos completos. Nunca compartas el CVV con nadie."
+  },
+  {
+    "id": "pago_servicios_como",
+    "categoria": "pagos",
+    "titulo": "¿Cómo Pago Servicios?",
+    "contenido": "Ve a 'Pago de Servicios', ingresa tu número de cliente o código del servicio que quieras pagar, y confirma."
+  },
+  {
+    "id": "error_fondos",
+    "categoria": "errores",
+    "titulo": "Error: Fondos Insuficientes",
+    "contenido": "Significa que no tienes suficiente dinero en tu cuenta para hacer la transacción. Verifica tu saldo en 'Resumen'."
+  },
+  {
+    "id": "error_cuenta_no_existe",
+    "categoria": "errores",
+    "titulo": "Error: Cuenta Destino No Existe",
+    "contenido": "La cuenta a la que intentas transferir no existe o el número es incorrecto. Verifica que empiece con SV_synapse."
+  },
+  {
+    "id": "error_limite_diario",
+    "categoria": "errores",
+    "titulo": "Error: Superaste el Límite Diario",
+    "contenido": "Ya has transferido el máximo permitido hoy. Intenta mañana o solicita al banco que aumente tu límite."
+  },
+  {
+    "id": "admin_login",
+    "categoria": "admin",
+    "titulo": "Login de Empleados",
+    "contenido": "En la página de login hay un enlace al pie para empleados. Solo el personal del banco puede acceder con credenciales especiales."
+  },
+  {
+    "id": "admin_dashboard",
+    "categoria": "admin",
+    "titulo": "Admin Dashboard",
+    "contenido": "Panel para administradores. Muestra KPIs, gestión de usuarios, cuentas, transacciones, auditoría, y opciones para crear empleados."
+  },
+  {
+    "id": "pago_card_number",
+    "categoria": "pagos",
+    "titulo": "Campo: Número de Tarjeta",
+    "contenido": "Ingresa el número de 16 dígitos de tu tarjeta de débito para procesar el pago."
+  },
+  {
+    "id": "pago_pin",
+    "categoria": "pagos",
+    "titulo": "Campo: PIN de Tarjeta",
+    "contenido": "Ingresa tu PIN de 4 dígitos. Se valida que sea correcto y que la tarjeta no esté vencida."
+  },
+  {
+    "id": "pago_monto",
+    "categoria": "pagos",
+    "titulo": "Campo: Monto a Pagar",
+    "contenido": "Ingresa la cantidad de dinero que deseas pagar. Debe ser mayor a cero."
+  },
+  {
+    "id": "pago_descripcion",
+    "categoria": "pagos",
+    "titulo": "Campo: Descripción del Servicio",
+    "contenido": "Describe qué servicio estás pagando (ej: recibo de luz, compras en línea, etc.). Esto aparecerá en tu historial."
+  },
+  {
+    "id": "pago_btn_confirmar",
+    "categoria": "pagos",
+    "titulo": "Botón: Realizar Pago Ahora",
+    "contenido": "Procesa el pago con tu tarjeta. Valida todos los datos y deduce el monto de tu cuenta."
+  },
+  {
+    "id": "pago_validaciones",
+    "categoria": "pagos",
+    "titulo": "Validaciones de Pago",
+    "contenido": "El sistema valida: tarjeta válida (16 dígitos), PIN correcto (4 dígitos), tarjeta no vencida, y monto mayor a cero."
+  },
+  {
+    "id": "tarjeta_solicitar_nueva",
+    "categoria": "tarjetas",
+    "titulo": "Solicitar Nueva Tarjeta",
+    "contenido": "Puedes solicitar hasta 2 tarjetas por cuenta. Elige el tipo (Débito o Virtual) e ingresa el nombre del titular."
+  },
+  {
+    "id": "tarjeta_limite_maximo",
+    "categoria": "tarjetas",
+    "titulo": "Límite de Tarjetas",
+    "contenido": "Cada cuenta puede tener un máximo de 2 tarjetas. Si alcanzas el límite, no puedes solicitar más."
+  },
+  {
+    "id": "tarjeta_datos_nuevos",
+    "categoria": "tarjetas",
+    "titulo": "Datos de Nueva Tarjeta",
+    "contenido": "Al crear una tarjeta nueva, el sistema genera: número de 16 dígitos, PIN de 4 dígitos, y fecha de expiración (4 años)."
+  },
+  {
+    "id": "tarjeta_descarga_pdf",
+    "categoria": "tarjetas",
+    "titulo": "Descargar Información de Tarjeta (PDF)",
+    "contenido": "Puedes descargar un PDF con los datos de tu nueva tarjeta para guardarlos. Incluye número, PIN, y tipo."
+  },
+  {
+    "id": "tarjeta_bloqueo",
+    "categoria": "tarjetas",
+    "titulo": "Bloqueo/Desbloqueo de Tarjeta",
+    "contenido": "Puedes activar o desactivar tu tarjeta. Cuando está bloqueada, no se puede usar para pagos pero sigue existiendo."
+  },
+  {
+    "id": "tarjeta_renovacion_pronto",
+    "categoria": "tarjetas",
+    "titulo": "Tarjeta Próxima a Expirar",
+    "contenido": "Cuando una tarjeta está a punto de expirar, aparecerá un aviso. Puedes renovarla pagando $5.00."
+  },
+  {
+    "id": "tarjeta_renovacion_pago",
+    "categoria": "tarjetas",
+    "titulo": "Pago de Renovación de Tarjeta",
+    "contenido": "El costo de renovación es de $5.00. Se deduce de tu cuenta cuando solicitas la renovación."
+  },
+  {
+    "id": "perfil_datos_personales",
+    "categoria": "perfil",
+    "titulo": "Datos Personales",
+    "contenido": "En 'Mi Perfil' puedes ver: nombre completo, email, número de teléfono, DUI, y género."
+  },
+  {
+    "id": "perfil_generar_estado_cuenta",
+    "categoria": "perfil",
+    "titulo": "Generar Estado de Cuenta (PDF)",
+    "contenido": "Descarga un PDF con tu estado de cuenta que incluye: datos personales, número de cuenta, saldo y todas las transacciones."
+  },
+  {
+    "id": "perfil_filtro_pdf",
+    "categoria": "perfil",
+    "titulo": "Filtrar Estado de Cuenta por Período",
+    "contenido": "Puedes opcionalmente filtrar el PDF por mes y año específico para descargar solo las transacciones de ese período."
+  },
+  {
+    "id": "historial_filtro_mes",
+    "categoria": "historial",
+    "titulo": "Filtrar Historial por Mes y Año",
+    "contenido": "En el historial puedes marcar 'Filtrar por mes y año' para ver solo movimientos de un período específico."
+  },
+  {
+    "id": "historial_pestanas",
+    "categoria": "historial",
+    "titulo": "Pestañas de Historial",
+    "contenido": "El historial está dividido en pestañas: Todos, Transferencias, Retiros, Depósitos, Pagos. Cada una muestra transacciones del tipo correspondiente."
+  },
+  {
+    "id": "historial_tipos",
+    "categoria": "historial",
+    "titulo": "Tipos de Movimientos",
+    "contenido": "En el historial ves 4 tipos: Transferencias (envíos a otras cuentas), Retiros (del ATM), Depósitos (al ATM), Pagos (con tarjeta)."
+  },
+  {
+    "id": "resumen_puntos_synapse",
+    "categoria": "home",
+    "titulo": "Puntos Synapse",
+    "contenido": "Tienes Puntos Synapse disponibles. Son parte de tu cuenta pero actualmente no tienen funcionalidad de redención activada."
+  },
+  {
+    "id": "tarjeta_tipo_debito",
+    "categoria": "tarjetas",
+    "titulo": "Tarjeta Tipo: Débito",
+    "contenido": "Tarjeta física o virtual vinculada a tu cuenta. Se deduce el dinero directamente de tu saldo."
+  },
+  {
+    "id": "tarjeta_tipo_virtual",
+    "categoria": "tarjetas",
+    "titulo": "Tarjeta Tipo: Virtual",
+    "contenido": "Tarjeta sin representación física. Tiene número, PIN y expiración como una tarjeta normal, pero solo existe en el sistema."
+  },
+  {
+    "id": "perfil_cambio_contrasena_campos",
+    "categoria": "perfil",
+    "titulo": "Cambiar Contraseña - Campos",
+    "contenido": "Ingresa tu contraseña actual, luego la nueva contraseña dos veces para confirmarla."
+  },
+  {
+    "id": "pago_error_tarjeta_vencida",
+    "categoria": "errores",
+    "titulo": "Error: Tarjeta Vencida",
+    "contenido": "La tarjeta ha expirado. No puedes usarla para pagos. Debes renovarla pagando $5.00 en 'Mis Tarjetas'."
+  },
+  {
+    "id": "pago_error_pin_invalido",
+    "categoria": "errores",
+    "titulo": "Error: PIN Inválido",
+    "contenido": "El PIN ingresado es incorrecto o no coincide con la tarjeta. Verifica que sea de 4 dígitos."
+  },
+  {
+    "id": "pago_error_tarjeta_no_existe",
+    "categoria": "errores",
+    "titulo": "Error: Tarjeta No Encontrada",
+    "contenido": "El número de tarjeta ingresado no existe en el sistema. Verifica que sea de 16 dígitos y que sea tu tarjeta."
+  },
+  {
+    "id": "transferencia_aprobacion",
+    "categoria": "transferencias",
+    "titulo": "Transferencias Pendientes de Aprobación",
+    "contenido": "Si transferencias un monto grande o el sistema detecta actividad sospechosa, la transferencia queda pendiente de aprobación administrativa."
+  },
+  {
+    "id": "transferencia_lista_espera",
+    "categoria": "transferencias",
+    "titulo": "¿Cuánto Tarda la Aprobación?",
+    "contenido": "Las transferencias pendientes se completan una vez que un administrador las revisa y aprueba. Pueden tardar unas pocas horas."
+  },
+  {
+    "id": "atm_recibo",
+    "categoria": "atm",
+    "titulo": "Recibo de Operación en ATM",
+    "contenido": "Después de confirmar un retiro o depósito, el ATM muestra un recibo virtual con los detalles de la transacción."
+  },
+  {
+    "id": "resumen_info",
+    "categoria": "home",
+    "titulo": "¿Qué Muestra Resumen?",
+    "contenido": "La opción 'Resumen' muestra dos tarjetas: tu Saldo Disponible actual en USD y tus Puntos Synapse disponibles."
+  }
+]
