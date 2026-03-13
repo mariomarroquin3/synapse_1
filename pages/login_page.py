@@ -96,6 +96,12 @@ with tab_login:
 
                 if user and verify_password(l_pass, user['password_hash']):
 
+                    # 🔒 VERIFICAR SI LA CUENTA ESTÁ ACTIVA
+                    if not user.get('is_active', True):
+                        st.error("❌ Tu cuenta ha sido desactivada o bloqueada. Contacta al banco.")
+                        time.sleep(2)
+                        st.stop()
+
                     # 🔎 BUSCAR CUENTA DEL USUARIO
                     account = get_account_by_user(user['Id_user'])
 
