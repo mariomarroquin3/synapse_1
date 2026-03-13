@@ -1124,9 +1124,10 @@ elif role_id == 4:
 
 import streamlit as st
 import pandas as pd
+import datetime
 from services.audit_service import log_action
 from config.database import get_cursor
-import datetime
+from card_print.audit_pdf import generar_pdf_auditoria
 
 if role_id == 5:
     st.header("Control de Riesgos - Auditor")
@@ -1141,74 +1142,108 @@ if role_id == 5:
         if "show_all_audit_admin" not in st.session_state:
             st.session_state.show_all_audit_admin = False
 
-        limit_admin = None if st.session_state.show_all_audit_admin else 50
-
         try:
-            if limit_admin is None:
-                with st.spinner("Cargando historial administrativo completo..."):
-                    rows = get_filtered_auditor_admin_logs(limit_admin)
-            else:
-                rows = get_filtered_auditor_admin_logs(limit_admin)
+            # Siempre cargamos todo para tener los datos completos para el PDF
+            with st.spinner("Cargando historial administrativo..."):
+                rows = get_filtered_auditor_admin_logs(None)
                 
             if rows:
-                    # Crear DataFrame seguro
-                    df_admin = pd.DataFrame.from_records(
-                        rows,
-                        columns=["ID", "Administrador", "Acción", "Detalles", "Fecha"]
-                    )
-                    df_admin['Fecha'] = pd.to_datetime(df_admin['Fecha'])
+                df_admin = pd.DataFrame.from_records(
+                    rows,
+                    columns=["ID", "Administrador", "Acción", "Detalles", "Fecha"]
+                )
+                df_admin['Fecha'] = pd.to_datetime(df_admin['Fecha'])
 
-                    # --- FILTRO POR ACCIÓN (con "Todos") ---
-                    acciones_unicas = sorted(df_admin['Acción'].dropna().unique().tolist())
-                    selected_accion = st.selectbox(
-                        "Filtrado por acción",
-                        ["Todos"] + acciones_unicas,
-                        key="filter_accion_admin"
-                    )
-                    if selected_accion != "Todos":
-                        df_admin = df_admin[df_admin['Acción'] == selected_accion]
+                # --- FILTRO POR ACCIÓN ---
+                acciones_unicas = sorted(df_admin['Acción'].dropna().unique().tolist())
+                selected_accion = st.selectbox(
+                    "Filtrado por acción",
+                    ["Todos"] + acciones_unicas,
+                    key="filter_accion_admin"
+                )
+                if selected_accion != "Todos":
+                    df_admin = df_admin[df_admin['Acción'] == selected_accion]
 
-                    # --- FILTRO POR ADMINISTRADOR ---
-                    search_admin = st.text_input(
-                        "🔎 Filtrado por Administrador",
-                        key="search_admin_audit"
-                    )
-                    if search_admin:
-                        df_admin = df_admin[
-                            df_admin['Administrador'].str.contains(search_admin, case=False, na=False)
-                        ]
+                # --- FILTRO POR ADMINISTRADOR ---
+                search_admin = st.text_input(
+                    "🔎 Filtrado por Administrador",
+                    key="search_admin_audit"
+                )
+                if search_admin:
+                    df_admin = df_admin[
+                        df_admin['Administrador'].str.contains(search_admin, case=False, na=False)
+                    ]
 
-                    # --- FILTRO OPCIONAL POR MES Y AÑO ---
-                    use_date_filter = st.checkbox(
-                        "Activar filtro por mes y año",
-                        key="enable_date_filter_admin"
+                # --- FILTRO LIBRE POR RANGO DE FECHAS ---
+                use_date_filter = st.checkbox(
+                    "📅 Activar filtro por rango de fechas",
+                    key="enable_date_filter_admin"
+                )
+                
+                date_range = None
+                if use_date_filter:
+                    today = datetime.date.today()
+                    if not df_admin.empty:
+                        default_start = df_admin['Fecha'].dt.date.min()
+                        default_end = df_admin['Fecha'].dt.date.max()
+                    else:
+                        default_start, default_end = today, today
+                        
+                    date_range = st.date_input(
+                        "Seleccione el rango de fechas",
+                        value=(default_start, default_end),
+                        key="date_range_admin"
                     )
-                    if use_date_filter:
-                        months = list(range(1, 13))
-                        years = list(range(df_admin['Fecha'].dt.year.min(), df_admin['Fecha'].dt.year.max() + 1))
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            selected_month = st.selectbox(
-                                "📅 Mes", months, index=datetime.datetime.now().month - 1, key="month_admin"
-                            )
-                        with col2:
-                            selected_year = st.selectbox(
-                                "📅 Año", years, index=len(years) - 1, key="year_admin"
-                            )
-                        df_admin = df_admin[
-                            (df_admin['Fecha'].dt.month == selected_month) &
-                            (df_admin['Fecha'].dt.year == selected_year)
-                        ]
-
-                    st.dataframe(df_admin, height=450, hide_index=True, use_container_width=True)
-                    st.caption(f"Mostrando {len(df_admin)} registros del historial administrativo.")
                     
-                    if limit_admin == 50 and len(df_admin) == 50:
-                        if st.button("📂 Mostrar todos los registros administrativos", key="btn_show_all_audit_admin"):
+                    if not df_admin.empty:
+                        if len(date_range) == 2:
+                            start_date, end_date = date_range
+                            df_admin = df_admin[
+                                (df_admin['Fecha'].dt.date >= start_date) & 
+                                (df_admin['Fecha'].dt.date <= end_date)
+                            ]
+                        elif len(date_range) == 1:
+                            start_date = date_range[0]
+                            df_admin = df_admin[df_admin['Fecha'].dt.date == start_date]
+
+                # --- LÓGICA DE VISUALIZACIÓN EN PANTALLA (Solo 50 o Todos) ---
+                if not st.session_state.show_all_audit_admin and len(df_admin) > 50:
+                    df_mostrar = df_admin.head(50)
+                    st.caption(f"Mostrando 50 de {len(df_admin)} registros. Utiliza la descarga PDF para obtener el informe completo.")
+                else:
+                    df_mostrar = df_admin
+                    st.caption(f"Mostrando los {len(df_admin)} registros.")
+
+                # Imprimimos la tabla limitada en pantalla
+                st.dataframe(df_mostrar, height=450, hide_index=True, use_container_width=True)
+                
+                # --- BOTÓN DE DESCARGA PDF (Usa df_admin COMPLETO) ---
+                if not df_admin.empty:
+                    rango_enviar = date_range if use_date_filter else None
+                    
+                    pdf_buffer_admin = generar_pdf_auditoria(
+                        df_admin, 
+                        "Reporte de Acciones Administrativas", 
+                        rango_enviar
+                    )
+                    
+                    st.download_button(
+                        label="📄 Descargar Reporte Completo en PDF",
+                        data=pdf_buffer_admin,
+                        file_name=f"Auditoria_Admin_{datetime.date.today()}.pdf",
+                        mime="application/pdf",
+                        key="btn_pdf_admin"
+                    )
+                # ------------------------------------
+                
+                # Botones para controlar la vista en pantalla
+                if len(df_admin) > 50:
+                    if not st.session_state.show_all_audit_admin:
+                        if st.button("📂 Mostrar todos los registros en pantalla", key="btn_show_all_audit_admin"):
                             st.session_state.show_all_audit_admin = True
                             st.rerun()
-                    elif limit_admin is None:
-                        if st.button("🔽 Volver a los 50 más recientes", key="btn_show_last_audit_admin"):
+                    else:
+                        if st.button("🔽 Volver a los 50 más recientes en pantalla", key="btn_show_last_audit_admin"):
                             st.session_state.show_all_audit_admin = False
                             st.rerun()
             else:
@@ -1223,76 +1258,113 @@ if role_id == 5:
         if "show_all_audit_trans" not in st.session_state:
             st.session_state.show_all_audit_trans = False
 
-        limit_trans = None if st.session_state.show_all_audit_trans else 50
-
         try:
-            if limit_trans is None:
-                with st.spinner("Cargando transacciones completas..."):
-                    rows = get_filtered_auditor_transactions(limit_trans)
-            else:
-                rows = get_filtered_auditor_transactions(limit_trans)
+            # Siempre cargamos todo
+            with st.spinner("Cargando transacciones completas..."):
+                rows = get_filtered_auditor_transactions(None)
 
             if rows:
-                    columns = [
-                        "ID Transacción", "Tipo_ID", "Status_ID", "Descripción",
-                        "ID Usuario", "Usuario", "Fecha Creación", "Procesado En"
-                    ]
-                    df_trans = pd.DataFrame.from_records(rows, columns=columns)
-                    df_trans['Fecha Creación'] = pd.to_datetime(df_trans['Fecha Creación'])
-                    df_trans['Procesado En'] = pd.to_datetime(df_trans['Procesado En'])
+                columns = [
+                    "ID Transacción", "Tipo_ID", "Status_ID", "Descripción",
+                    "ID Usuario", "Usuario", "Fecha Creación", "Procesado En"
+                ]
+                df_trans = pd.DataFrame.from_records(rows, columns=columns)
+                df_trans['Fecha Creación'] = pd.to_datetime(df_trans['Fecha Creación'])
+                df_trans['Procesado En'] = pd.to_datetime(df_trans['Procesado En'])
 
-                    # --- MAPEO TIPO DE TRANSACCIÓN ---
-                    tipo_dict = {1: "Transferencia", 2: "Retiro", 3: "Depósito", 4: "Pago"}
-                    df_trans['Tipo Nombre'] = df_trans['Tipo_ID'].map(tipo_dict).fillna("Desconocido")
+                # --- MAPEO TIPO DE TRANSACCIÓN ---
+                tipo_dict = {1: "Transferencia", 2: "Retiro", 3: "Depósito", 4: "Pago"}
+                df_trans['Tipo Nombre'] = df_trans['Tipo_ID'].map(tipo_dict).fillna("Desconocido")
 
-                    # --- FILTROS ---
-                    col_f1, col_f2 = st.columns(2)
-                    with col_f1:
-                        search_user = st.text_input("🔎 Filtrar por Usuario", key="search_user_trans")
-                    with col_f2:
-                        tipo_options = ["Todos"] + list(tipo_dict.values())
-                        selected_tipo = st.selectbox("Filtrar por tipo de transacción", tipo_options, key="filter_tipo_trans")
+                # --- FILTROS ---
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    search_user = st.text_input("🔎 Filtrar por Usuario", key="search_user_trans")
+                with col_f2:
+                    tipo_options = ["Todos"] + list(tipo_dict.values())
+                    selected_tipo = st.selectbox("Filtrar por tipo de transacción", tipo_options, key="filter_tipo_trans")
 
-                    # Filtro opcional por Mes y Año
-                    use_date_filter = st.checkbox("📅 Activar filtro por mes y año", key="enable_date_filter_trans")
+                df_filtered = df_trans.copy()
+                
+                if search_user:
+                    df_filtered = df_filtered[df_filtered['Usuario'].str.contains(search_user, case=False, na=False)]
+                if selected_tipo != "Todos":
+                    df_filtered = df_filtered[df_filtered['Tipo Nombre'] == selected_tipo]
 
-                    df_filtered = df_trans.copy()
-                    if search_user:
-                        df_filtered = df_filtered[df_filtered['Usuario'].str.contains(search_user, case=False, na=False)]
-                    if selected_tipo != "Todos":
-                        df_filtered = df_filtered[df_filtered['Tipo Nombre'] == selected_tipo]
-                    if use_date_filter:
-                        available_years = sorted(df_filtered['Fecha Creación'].dt.year.unique().tolist(), reverse=True)
-                        if not available_years:
-                            available_years = [datetime.datetime.now().year]
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            sel_month = st.selectbox("Mes", list(range(1, 13)), index=datetime.datetime.now().month - 1, key="m_trans")
-                        with c2:
-                            sel_year = st.selectbox("Año", available_years, key="y_trans")
-                        df_filtered = df_filtered[
-                            (df_filtered['Fecha Creación'].dt.month == sel_month) &
-                            (df_filtered['Fecha Creación'].dt.year == sel_year)
-                        ]
-
-                    display_cols = [
-                        "ID Transacción", "Usuario", "Tipo Nombre", "Descripción",
-                        "Fecha Creación", "Procesado En", "Status_ID"
-                    ]
-                    st.dataframe(df_filtered[display_cols], height=450, hide_index=True, use_container_width=True)
-                    st.caption(f"Mostrando {len(df_filtered)} transacciones encontradas.")
+                # --- FILTRO LIBRE POR RANGO DE FECHAS ---
+                use_date_filter_trans = st.checkbox("📅 Activar filtro por rango de fechas", key="enable_date_filter_trans")
+                
+                date_range_t = None
+                if use_date_filter_trans:
+                    today = datetime.date.today()
+                    if not df_filtered.empty:
+                        default_start_t = df_filtered['Fecha Creación'].dt.date.min()
+                        default_end_t = df_filtered['Fecha Creación'].dt.date.max()
+                    else:
+                        default_start_t, default_end_t = today, today
+                        
+                    date_range_t = st.date_input(
+                        "Seleccione el rango de fechas",
+                        value=(default_start_t, default_end_t),
+                        key="date_range_trans"
+                    )
                     
-                    if limit_trans == 50 and len(df_filtered) == 50:
-                        if st.button("📂 Mostrar todas las transacciones", key="btn_show_all_audit_trans"):
+                    if not df_filtered.empty:
+                        if len(date_range_t) == 2:
+                            start_date_t, end_date_t = date_range_t
+                            df_filtered = df_filtered[
+                                (df_filtered['Fecha Creación'].dt.date >= start_date_t) & 
+                                (df_filtered['Fecha Creación'].dt.date <= end_date_t)
+                            ]
+                        elif len(date_range_t) == 1:
+                            start_date_t = date_range_t[0]
+                            df_filtered = df_filtered[df_filtered['Fecha Creación'].dt.date == start_date_t]
+
+                display_cols = [
+                    "ID Transacción", "Usuario", "Tipo Nombre", "Descripción",
+                    "Fecha Creación", "Procesado En", "Status_ID"
+                ]
+                
+                # --- LÓGICA DE VISUALIZACIÓN EN PANTALLA (Solo 50 o Todos) ---
+                if not st.session_state.show_all_audit_trans and len(df_filtered) > 50:
+                    df_mostrar_trans = df_filtered.head(50)
+                    st.caption(f"Mostrando 50 de {len(df_filtered)} transacciones. Descarga el PDF para obtener todas.")
+                else:
+                    df_mostrar_trans = df_filtered
+                    st.caption(f"Mostrando {len(df_filtered)} transacciones encontradas.")
+
+                st.dataframe(df_mostrar_trans[display_cols], height=450, hide_index=True, use_container_width=True)
+                
+                # --- BOTÓN DE DESCARGA PDF (Usa df_filtered COMPLETO) ---
+                if not df_filtered.empty:
+                    rango_enviar_trans = date_range_t if use_date_filter_trans else None
+                    
+                    pdf_buffer_trans = generar_pdf_auditoria(
+                        df_filtered[display_cols], 
+                        "Reporte de Transacciones del Sistema", 
+                        rango_enviar_trans
+                    )
+                    
+                    st.download_button(
+                        label="📄 Descargar Reporte Completo en PDF",
+                        data=pdf_buffer_trans,
+                        file_name=f"Auditoria_Transacciones_{datetime.date.today()}.pdf",
+                        mime="application/pdf",
+                        key="btn_pdf_trans"
+                    )
+                # ------------------------------------
+                
+                # Botones para controlar la vista en pantalla
+                if len(df_filtered) > 50:
+                    if not st.session_state.show_all_audit_trans:
+                        if st.button("📂 Mostrar todas las transacciones en pantalla", key="btn_show_all_audit_trans"):
                             st.session_state.show_all_audit_trans = True
                             st.rerun()
-                    elif limit_trans is None:
-                        if st.button("🔽 Volver a los 50 más recientes", key="btn_show_last_audit_trans"):
+                    else:
+                        if st.button("🔽 Volver a los 50 más recientes en pantalla", key="btn_show_last_audit_trans"):
                             st.session_state.show_all_audit_trans = False
                             st.rerun()
             else:
                 st.info("No se encontraron registros de transacciones.")
         except Exception as e:
             st.error(f"Error crítico al cargar historial de transacciones: {e}")
-
-            
