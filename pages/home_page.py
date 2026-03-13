@@ -115,6 +115,10 @@ if len(user_accounts) < 5:
         except Exception as e:
             st.sidebar.error(str(e))
 
+if st.sidebar.button("🤖 Consulte a la IA", use_container_width=True):
+    import webbrowser
+    webbrowser.open(r"C:\Users\jonat\Documents\GitHub\synapse_1\RAG_SYNAPSE\index.html")
+
 # ==========================================================
 # --- VALIDACIÓN DE SEGURIDAD (LOGICA ACTUALIZADA) ---
 # ==========================================================
