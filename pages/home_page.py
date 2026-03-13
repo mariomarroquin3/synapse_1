@@ -149,11 +149,7 @@ if st.sidebar.button("🏧 CAJERO", width="stretch", type="primary"):
 
 if menu == "Resumen":
     balance = get_account_balance(account["Id_account"]) if account["Id_account"] else 0.0
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Saldo Disponible", f"$ {balance:,.2f} {account['currency']}")
-    with col2:
-        st.metric("Puntos Synapse", "500 pts")
+    st.metric("Saldo Disponible", f"$ {balance:,.2f} {account['currency']}")
 
 elif menu == "Transferencias":
     st.subheader("Transferencias a Terceros")
