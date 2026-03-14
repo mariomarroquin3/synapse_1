@@ -193,7 +193,7 @@ def get_pending_renewals():
             cr.Id_renewal,
             cr.card_id,
             cr.requested_at,
-            c.card_number_last4,
+            c.card_number,
             a.account_number,
             u.full_name,
             u.DUI
@@ -215,14 +215,14 @@ def finalize_card_renewal(renewal_id: int, card_id: int, admin_id: int) -> bool:
     """Agrega 3 años a la tarjeta, la reactiva y marca el ticket como procesado."""
     try:
         # 1. Obtener la expiración actual desde la tabla base
-        q_exp = "SELECT [expiration_date], [card_number_last4] FROM [card] WHERE [Id_card] = ?"
+        q_exp = "SELECT [expiration_date], [card_number] FROM [card] WHERE [Id_card] = ?"
         with get_cursor() as cursor:
             cursor.execute(q_exp, (card_id,))
             row = cursor.fetchone()
             if not row:
                 raise Exception("Tarjeta no encontrada para renovación.")
             current_exp = row[0]
-            last4 = row[1]
+            full_card_number = row[1]
         
         # 2. Agregar 3 años a esa fecha
         from dateutil.relativedelta import relativedelta
@@ -237,7 +237,7 @@ def finalize_card_renewal(renewal_id: int, card_id: int, admin_id: int) -> bool:
             cursor.execute(q_update_ticket, (renewal_id,))
             
         from services.audit_service import log_action
-        log_action(admin_id, "FINALIZO_RENOVACION_TARJETA", f"Cajero entregó y reactivó tarjeta ****{last4}. Nueva expiración: {new_exp.strftime('%m/%y')}")
+        log_action(admin_id, "FINALIZO_RENOVACION_TARJETA", f"Cajero entregó y reactivó tarjeta {full_card_number}. Nueva expiración: {new_exp.strftime('%m/%y')}")
         
         return True
     except Exception as e:

@@ -502,8 +502,8 @@ if role_id == 3:
                                 with st.container(border=True):
                                     tc1, tc2 = st.columns([3, 1])
                                     with tc1:
-                                        last4 = str(card["card_number"])[-4:]
-                                        st.write(f"**** {last4}")
+                                        full_card = str(card["card_number"])
+                                        st.write(f"{full_card}")
                                     with tc2:
                                         # Usamos un nombre de variable único para evitar la línea amarilla
                                         nuevo_estado_card = st.toggle(
@@ -525,7 +525,7 @@ if role_id == 3:
                                                     log_action(
                                                         user_id=int(admin_id),
                                                         action=accion_txt,
-                                                        details=f"Admin cambió estado de la tarjeta ****{last4} de la cuenta {ac_num}"
+                                                        details=f"Admin cambió estado de la tarjeta {full_card} de la cuenta {ac_num}"
                                                     )
                                                 
                                                 st.cache_data.clear()
@@ -946,7 +946,7 @@ elif role_id == 1:
                     st.caption(f"DUI: {r['DUI']}")
 
                 with c2:
-                    st.markdown(f"**Tarjeta (****{r['card_number_last4']})**")
+                    st.markdown(f"**Tarjeta ({r['card_number']})**")
                     st.caption(
                         f"Cuenta: {r['account_number']} | "
                         f"Solicitado: {r['requested_at'].strftime('%d/%m/%Y %H:%M') if r['requested_at'] else 'N/A'}"
@@ -972,7 +972,7 @@ elif role_id == 1:
                                 log_action(
                                     st.session_state['user_data']['Id_user'],
                                     "ENTREGA_TARJETA",
-                                    f"Entrega de tarjeta terminada ****{r['card_number_last4']}"
+                                    f"Entrega de tarjeta terminada {r['card_number']}"
                                 )
 
                                 st.success("¡Tarjeta renovada y activada exitosamente!")
