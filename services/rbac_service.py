@@ -72,6 +72,57 @@ def execute_analyst_query() -> dict:
         if cursor: cursor.close()
         if conn: conn.close()
 
+
+def get_daily_transaction_counts(start_date, end_date) -> dict:
+    """
+    Role ID = 4 (Analista Financiero)
+    Retorna el conteo real de transacciones agrupadas por dia dentro del rango dado.
+    Compatible con MS Access usando Format() para agrupar por fecha.
+    Args:
+        start_date: datetime.date o datetime.datetime inicio
+        end_date:   datetime.date o datetime.datetime fin
+    Returns:
+        dict: {"status": 200, "data": [{"fecha": "YYYY-MM-DD", "cantidad": int}, ...]}
+    """
+    from datetime import datetime, time as dtime
+
+    # Convertir date a datetime si es necesario
+    if hasattr(start_date, 'year') and not hasattr(start_date, 'hour'):
+        dt_start = datetime.combine(start_date, dtime.min)
+        dt_end   = datetime.combine(end_date,   dtime.max)
+    else:
+        dt_start = start_date
+        dt_end   = end_date
+
+    # MS Access usa Format() para agrupar por fecha — no soporta DATE() ni CAST
+    query = """
+        SELECT Format(transaction_date, 'yyyy-mm-dd') AS fecha, COUNT(*) AS cantidad
+        FROM [transaction]
+        WHERE transaction_date BETWEEN ? AND ?
+        GROUP BY Format(transaction_date, 'yyyy-mm-dd')
+        ORDER BY Format(transaction_date, 'yyyy-mm-dd')
+    """
+
+    if not is_query_safe(query):
+        return {"error": "403 Acceso Denegado.", "status": 403, "data": None}
+
+    conn = None
+    cursor = None
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(query, (dt_start, dt_end))
+        rows = cursor.fetchall()
+        data = [{"fecha": row[0], "cantidad": int(row[1])} for row in rows if row[0]]
+        return {"status": 200, "data": data}
+    except Exception as e:
+        return {"error": str(e), "status": 500, "data": None}
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+
+
 def execute_auditor_query() -> dict:
     """
     Role ID = 5 (Auditor)

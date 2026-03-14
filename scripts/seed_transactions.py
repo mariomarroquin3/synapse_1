@@ -47,8 +47,8 @@ from services.transaction_service import (
 MAX_AMOUNT_AUTO   = 9_999.0   # Por debajo del límite de aprobación ($10,000)
 INITIAL_DEPOSIT_MIN = 1_000.0
 INITIAL_DEPOSIT_MAX = 5_000.0
-TX_PER_ACCOUNT_MIN  = 5
-TX_PER_ACCOUNT_MAX  = 10
+TX_PER_ACCOUNT_MIN  = 1
+TX_PER_ACCOUNT_MAX  = 2
 
 DEPOSIT_DESCRIPTIONS = [
     "Depósito en efectivo", "Abono de nómina", "Transferencia recibida",
@@ -71,6 +71,30 @@ TRANSFER_DESCRIPTIONS = [
 # ─────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────
+def _get_masked_card_for_description(account_id: int) -> str | None:
+    """Extrae los últimos 4 dígitos del número de tarjeta para el log."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    # Obtenemos el card_number de 16 dígitos
+    cursor.execute("SELECT card_number FROM [card] WHERE account_id = ? AND is_active = True", (account_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        full_number = row[0]
+        return full_number[-4:] # Extraemos los últimos 4 del número real
+    return None
+
+from datetime import datetime, timedelta
+
+def _get_random_past_date(days_back: int = 90) -> datetime:
+    """Genera una fecha aleatoria entre hoy y N días atrás."""
+    random_days = random.randint(0, days_back)
+    random_hours = random.randint(0, 23)
+    random_minutes = random.randint(0, 59)
+    
+    past_date = datetime.now() - timedelta(days=random_days, hours=random_hours, minutes=random_minutes)
+    return past_date
 
 def _get_active_accounts() -> list[dict]:
     """Retorna todas las cuentas con status_id=1 (ACTIVO)."""
@@ -138,11 +162,11 @@ def phase_initial_funding(accounts: list[dict], actor_id: int) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# Transacciones aleatorias
+# Transacciones aleatorias (CORREGIDO: Ahora recibe el owner_id)
 # ─────────────────────────────────────────────────────────────────────────
 
-def _do_transfer(from_id: int, all_ids: list[int], actor_id: int) -> dict:
-    """Crea una transferencia a una cuenta aleatoria distinta."""
+def _do_transfer(from_id: int, owner_id: int, all_ids: list[int]) -> dict:
+    """Crea una transferencia siendo el dueño de la cuenta quien la ejecuta."""
     candidates = [i for i in all_ids if i != from_id]
     if not candidates:
         return {"success": False, "error": "No hay cuentas destino disponibles."}
@@ -150,143 +174,122 @@ def _do_transfer(from_id: int, all_ids: list[int], actor_id: int) -> dict:
     to_id  = random.choice(candidates)
     amount = _safe_debit_amount(from_id)
     if amount is None:
-        return {"success": False, "error": "Fondos insuficientes para transferencia."}
+        return {"success": False, "error": "Fondos insuficientes."}
 
     return create_transfer(
         from_account_id=from_id,
         to_account_id=to_id,
         amount=amount,
         description=random.choice(TRANSFER_DESCRIPTIONS),
-        created_by_user_id=actor_id,
+        created_by_user_id=owner_id, # <--- CAMBIO: El usuario dueño transacciona
         transaction_type_id=1,
     )
 
-
-def _do_withdrawal(acc_id: int, actor_id: int) -> dict:
-    """Crea un retiro (DEBIT, tx_type=2)."""
+def _do_withdrawal(acc_id: int, owner_id: int) -> dict:
+    """Cajero Automático: El dueño retira su dinero."""
     amount = _safe_debit_amount(acc_id)
-    if amount is None:
-        return {"success": False, "error": "Fondos insuficientes para retiro."}
+    if amount is None: return {"success": False, "error": "Fondos insuficientes."}
 
     return create_simple_transaction(
         account_id=acc_id,
         amount=amount,
         entry_type=ENTRY_DEBIT,
         description=random.choice(WITHDRAWAL_DESCRIPTIONS),
-        created_by_user_id=actor_id,
+        created_by_user_id=owner_id, # <--- CAMBIO
         transaction_type_id=2,
     )
 
-
-def _do_deposit(acc_id: int, actor_id: int) -> dict:
-    """Crea un depósito (CREDIT, tx_type=3)."""
+def _do_deposit(acc_id: int, owner_id: int) -> dict:
     amount = _rand_amount(10.0, MAX_AMOUNT_AUTO)
     return create_simple_transaction(
         account_id=acc_id,
         amount=amount,
         entry_type=ENTRY_CREDIT,
         description=random.choice(DEPOSIT_DESCRIPTIONS),
-        created_by_user_id=actor_id,
+        created_by_user_id=owner_id, # <--- CAMBIO
         transaction_type_id=3,
     )
 
+def _do_payment(acc_id: int, owner_id: int) -> dict:
+    """
+    Simula un pago de servicio utilizando la tarjeta vinculada a la cuenta.
+    """
+    # 1. Intentamos obtener la tarjeta (necesaria para el realismo del log)
+    card_info = _get_masked_card_for_description(acc_id)
+    
+    # 2. Si por alguna razón la cuenta no tiene tarjeta, fallamos la TX
+    # Esto ayuda a validar que el seed_cards corrió bien
+    if not card_info:
+        return {"success": False, "error": f"Cuenta {acc_id} no tiene tarjeta activa para pagos."}
 
-def _do_payment(acc_id: int, actor_id: int) -> dict:
-    """Crea un pago de servicio (DEBIT, tx_type=4)."""
-    amount = _safe_debit_amount(acc_id, cap=500.0)   # Pagos más pequeños
-    if amount is None:
-        return {"success": False, "error": "Fondos insuficientes para pago."}
+    # 3. Calculamos un monto lógico para servicios (capado a $500 para realismo)
+    amount = _safe_debit_amount(acc_id, cap=500.0)
+    if amount is None: 
+        return {"success": False, "error": "Fondos insuficientes para cubrir el recibo."}
 
+    # 4. Construimos una descripción detallada
+    # Ejemplo: "Pago de electricidad (Visa: ****1234)"
+    service_name = random.choice(PAYMENT_DESCRIPTIONS)
+    full_description = f"{service_name} (Tarj: ****{card_info})"
+
+    # 5. Ejecutamos la transacción
     return create_simple_transaction(
         account_id=acc_id,
         amount=amount,
         entry_type=ENTRY_DEBIT,
-        description=random.choice(PAYMENT_DESCRIPTIONS),
-        created_by_user_id=actor_id,
-        transaction_type_id=4,
+        description=full_description,
+        created_by_user_id=owner_id,
+        transaction_type_id=4,   # Tipo: Pago de Servicio
     )
 
+# ─────────────────────────────────────────────────────────────────────────
+# Fases de ejecución actualizadas
+# ─────────────────────────────────────────────────────────────────────────
 
-def phase_random_transactions(accounts: list[dict], actor_id: int) -> None:
-    """Genera transacciones aleatorias para cada cuenta."""
+def phase_initial_funding(accounts: list[dict], fallback_actor_id: int) -> None:
+    """Fondeo inicial: Aquí sí puede ser el Admin o el propio usuario."""
+    print("\n── Fase 1: Fondeo inicial ──────────────────────────────")
+    for acc in accounts:
+        acc_id = acc["Id_account"]
+        owner_id = acc["user_id"] # Usamos el dueño de la cuenta
+        amount = _rand_amount(INITIAL_DEPOSIT_MIN, INITIAL_DEPOSIT_MAX)
+        
+        create_simple_transaction(
+            account_id=acc_id,
+            amount=amount,
+            entry_type=ENTRY_CREDIT,
+            description="[Fondeo inicial] Depósito de apertura",
+            created_by_user_id=owner_id, # El usuario 'abre' su cuenta
+            transaction_type_id=3,
+        )
+    print(f"  ✅ {len(accounts)} cuentas fondeadas.")
+
+def phase_random_transactions(accounts: list[dict]) -> None:
+    """Genera transacciones distribuidas por usuario."""
     print("\n── Fase 2: Transacciones aleatorias ────────────────────")
     all_ids  = [a["Id_account"] for a in accounts]
-    tx_types = [1, 2, 3, 4]   # Los 4 tipos disponibles
-
-    total_ok  = 0
-    total_err = 0
+    total_ok = 0
 
     for acc in accounts:
         acc_id = acc["Id_account"]
-        n_tx   = random.randint(TX_PER_ACCOUNT_MIN, TX_PER_ACCOUNT_MAX)
-        print(f"\n  Cuenta {acc_id}: {n_tx} transacciones")
+        owner_id = acc["user_id"] # <--- IMPORTANTE: Recuperamos el dueño real
+        n_tx = random.randint(TX_PER_ACCOUNT_MIN, TX_PER_ACCOUNT_MAX)
 
         for _ in range(n_tx):
-            tx_type = random.choice(tx_types)
+            tx_type = random.choice([1, 2, 3, 4])
+            if tx_type == 1:   res = _do_transfer(acc_id, owner_id, all_ids)
+            elif tx_type == 2: res = _do_withdrawal(acc_id, owner_id)
+            elif tx_type == 3: res = _do_deposit(acc_id, owner_id)
+            else:              res = _do_payment(acc_id, owner_id)
 
-            if tx_type == 1:
-                result = _do_transfer(acc_id, all_ids, actor_id)
-            elif tx_type == 2:
-                result = _do_withdrawal(acc_id, actor_id)
-            elif tx_type == 3:
-                result = _do_deposit(acc_id, actor_id)
-            else:  # tx_type == 4
-                result = _do_payment(acc_id, actor_id)
+            if res["success"]: total_ok += 1
 
-            type_labels = {1: "Transferencia", 2: "Retiro", 3: "Depósito", 4: "Pago"}
-            label = type_labels[tx_type]
-
-            if result["success"]:
-                tx_id = result.get("transaction_id", "?")
-                print(f"    ✅ [{label}] TX-{tx_id}")
-                total_ok += 1
-            else:
-                err = result.get("error", "desconocido")
-                print(f"    ⚠️  [{label}] {err}")
-                total_err += 1
-
-    print(f"\n  Total OK: {total_ok} | Total errores/omitidos: {total_err}")
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# Punto de entrada
-# ─────────────────────────────────────────────────────────────────────────
-
-def _get_actor_id() -> int:
-    """Obtiene el ID del admin para usarlo como created_by_user_id."""
-    from models.user_model import get_user_by_email
-    user = get_user_by_email("admin@synapse.com")
-    if user:
-        return int(user["Id_user"])
-    # Fallback: primer usuario disponible
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT TOP 1 Id_user FROM [user] ORDER BY Id_user")
-    row = cursor.fetchone()
-    cursor.close()
-    conn.close()
-    return int(row[0]) if row else 1
-
+    print(f"  ✅ Seed finalizado: {total_ok} transacciones reales creadas.")
 
 if __name__ == "__main__":
-    print("=" * 55)
-    print("  SEED — Tablas [transaction] + [ledger_entry]")
-    print("=" * 55)
-
-    actor_id = _get_actor_id()
-    print(f"\n  Actor (created_by_user_id): {actor_id}")
-
+    # 1. Obtener cuentas (ya traen el user_id)
     accounts = _get_active_accounts()
-    if not accounts:
-        print("\n  ⚠️  No se encontraron cuentas activas.")
-        print("  Ejecuta primero: seed_users.py → seed_accounts.py")
-        sys.exit(1)
-
-    print(f"  Cuentas activas encontradas: {len(accounts)}")
-
-    phase_initial_funding(accounts, actor_id)
-    phase_random_transactions(accounts, actor_id)
-
-    print("\n" + "=" * 55)
-    print("  Seed de transacciones finalizado.")
-    print("=" * 55)
+    
+    # 2. Ejecutar fases sin forzar un único actor global
+    phase_initial_funding(accounts, 1) 
+    phase_random_transactions(accounts)

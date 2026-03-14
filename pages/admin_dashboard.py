@@ -20,6 +20,24 @@ from utils.ui_components import apply_premium_style
 from models.account_model import get_pending_accounts, approve_account, reject_account
 
 
+# ─────────────────────────────────────────────
+# VALIDACIÓN DE DUI (Formato Salvadoreño)
+# ─────────────────────────────────────────────
+def validate_dui(dui: str) -> bool:
+    """
+    Valida que el DUI tenga exactamente 9 dígitos numéricos, 
+    permitiendo que el usuario ingrese o no el guion.
+    """
+    if not dui:
+        return False
+        
+    # Eliminamos cualquier carácter que no sea un número (guiones, espacios, letras)
+    dui_limpio = re.sub(r'\D', '', dui) 
+    
+    # Validamos que el resultado sean exactamente 9 números
+    return len(dui_limpio) == 9
+
+
 # --- SEGURIDAD DE PÁGINA ---
 if "user_data" not in st.session_state or st.session_state["user_data"]["role_id"] not in [1, 3, 4, 5]:
     st.error("Acceso denegado. Se requieren privilegios de Personal Interno.")
@@ -261,19 +279,22 @@ if role_id == 3:
                 if submit_staff:
                     if not s_name or not s_email or not s_pass or not s_dui:
                         st.warning("Complete los campos obligatorios.")
+                    elif not validate_dui(s_dui):
+                        st.error("⚠️ DUI inválido. El formato requerido es: 00000000-0 (8 dígitos, guion, 1 dígito verificador). Solo se permiten números.")
                     else:
                         user_data = {
                             "role_id": s_role[0],
                             "email": s_email,
                             "password": s_pass,
-                            "dui": f"{s_dui[:8]}-{s_dui[8:]}" if len(s_dui) == 9 else s_dui,
+                            "dui": s_dui.strip(),
                             "full_name": s_name,
                             "gender": s_gen[0],
                             "phone_number": f"+503 {s_phone[:4]}-{s_phone[4:]}" if len(s_phone) == 8 else s_phone
                         }
                         res = register_user_with_permissions(st.session_state["user_data"]["Id_user"], user_data)
                         if res["success"]:
-                            st.success(f"Usuario {s_role[1]} creado exitosamente.")
+                            st.success(f"✅ Usuario {s_role[1]} **{s_name}** creado exitosamente.")
+                            st.balloons()
                             st.rerun()
                         else:
                             st.error(f"Error: {res['error']}")
@@ -773,7 +794,7 @@ elif role_id == 1:
     
     from models.user_model import get_user_by_id
 
-    from services.transaction_service import create_simple_transaction
+    from services.transaction_service import create_simple_transaction, create_transfer
     from models.card_model import get_pending_renewals, finalize_card_renewal
     from services.audit_service import log_action
 
@@ -986,11 +1007,73 @@ elif role_id == 1:
 
                     st.markdown('</div>', unsafe_allow_html=True)
 
+    st.divider()
+
+    # -------------------------------------------------
+    # TRANSFERENCIAS GLOBALES (CAJERO)
+    # -------------------------------------------------
+    st.subheader("💸 Transferencias Globales")
+    st.write("Realiza transferencias entre cualquier par de cuentas del banco.")
+
+    with st.form("cajero_transfer_form"):
+        col_tf1, col_tf2 = st.columns(2)
+        with col_tf1:
+            tf_origen  = st.text_input("Cuenta Origen",  placeholder="Ej. SV_synapse1234567")
+            tf_monto   = st.number_input("Monto ($)", min_value=0.01, step=10.0, format="%.2f")
+        with col_tf2:
+            tf_destino = st.text_input("Cuenta Destino", placeholder="Ej. SV_synapse7654321")
+            tf_desc    = st.text_input("Descripción",    placeholder="Ej. Transferencia por cajero")
+
+        sub_tf = st.form_submit_button("⚡ Ejecutar Transferencia", type="primary", use_container_width=True)
+
+        if sub_tf:
+            if not tf_origen or not tf_destino or not tf_desc or tf_monto <= 0:
+                st.warning("Complete todos los campos correctamente.")
+            elif tf_origen.strip() == tf_destino.strip():
+                st.error("❌ Las cuentas origen y destino no pueden ser la misma.")
+            else:
+                acc_orig = get_account_by_number(tf_origen.strip())
+                acc_dest = get_account_by_number(tf_destino.strip())
+
+                if not acc_orig:
+                    st.error("❌ Cuenta origen no encontrada.")
+                elif not acc_dest:
+                    st.error("❌ Cuenta destino no encontrada.")
+                else:
+                    # Obtener IDs de forma segura (dict o tuple)
+                    orig_id = acc_orig.get('Id_account') if isinstance(acc_orig, dict) else acc_orig[0]
+                    dest_id = acc_dest.get('Id_account') if isinstance(acc_dest, dict) else acc_dest[0]
+
+                    try:
+                        res_tf = create_transfer(
+                            from_account_id=orig_id,
+                            to_account_id=dest_id,
+                            amount=tf_monto,
+                            description=tf_desc,
+                            created_by_user_id=st.session_state['user_data']['Id_user'],
+                            transaction_type_id=1
+                        )
+
+                        if res_tf.get('success'):
+                            log_action(
+                                st.session_state['user_data']['Id_user'],
+                                "TRANSFERENCIA_CAJERO",
+                                f"Cajero realizó transferencia de ${tf_monto:,.2f} de {tf_origen} a {tf_destino}: {tf_desc}"
+                            )
+                            if res_tf.get('requires_approval'):
+                                st.warning(f"⏳ Transferencia de ${tf_monto:,.2f} retenida para aprobación (monto >= $10,000).")
+                            else:
+                                st.success(f"✅ Transferencia de ${tf_monto:,.2f} realizada exitosamente.")
+                        else:
+                            st.error(f"❌ Error: {res_tf.get('error')}")
+                    except Exception as e:
+                        st.error(f"❌ Error de base de datos: {str(e)}")
+
 elif role_id == 4:
     st.header("📊 Panel de Métricas - Analista Financiero")
     st.write("Vista de solo lectura orientada a la toma de decisiones estratégicas.")
 
-    from services.rbac_service import execute_analyst_query
+    from services.rbac_service import execute_analyst_query, get_daily_transaction_counts
     import pandas as pd
     import altair as alt
     from datetime import datetime, timedelta
@@ -1077,40 +1160,44 @@ elif role_id == 4:
                 st.altair_chart(chart_donut, use_container_width=True)
 
         with col_b1:
-            st.subheader("🕒 Evolución Temporal")
-            
-            historico = data.get('historico')
-            
-            if historico:
-                # Si el backend ya tiene los datos, los usamos
-                df_hist = pd.DataFrame(historico)
-            else:
-                # SIMULACIÓN PROFESIONAL: Si no hay datos, creamos una serie temporal de prueba
-                # Esto sirve para mostrar la funcionalidad en la etapa de planificación
-                date_range = pd.date_range(start=start_date, end=end_date)
-                import numpy as np
-                df_hist = pd.DataFrame({
-                    'fecha': date_range,
-                    'cantidad': np.random.randint(5, 50, size=len(date_range)) # Genera números aleatorios entre 5 y 50
-                })
-                st.caption("⚠️ Nota: Visualizando datos simulados (Tendencia proyectada).")
+            st.subheader("🕒 Evolución Temporal de Transacciones")
 
-            # Gráfico de Líneas con Área (se ve más profesional)
-            chart_evolucion = alt.Chart(df_hist).mark_area(
-                line={'color':'#FF9800'},
-                color=alt.Gradient(
-                    gradient='linear',
-                    stops=[alt.GradientStop(color='white', offset=0),
-                           alt.GradientStop(color='#FF9800', offset=1)],
-                    x1=1, x2=1, y1=1, y2=0
-                )
-            ).encode(
-                x=alt.X('fecha:T', title="Línea de Tiempo"),
-                y=alt.Y('cantidad:Q', title="N° de Operaciones"),
-                tooltip=[alt.Tooltip('fecha:T', title='Fecha'), alt.Tooltip('cantidad:Q', title='Transacciones')]
-            ).properties(height=300).interactive()
-            
-            st.altair_chart(chart_evolucion, use_container_width=True)
+            try:
+                hist_res = get_daily_transaction_counts(start_date, end_date)
+
+                if hist_res.get('status') == 200 and hist_res.get('data'):
+                    df_hist = pd.DataFrame(hist_res['data'])
+                    df_hist['fecha'] = pd.to_datetime(df_hist['fecha'])
+
+                    chart_evolucion = alt.Chart(df_hist).mark_area(
+                        line={'color': '#FF9800'},
+                        color=alt.Gradient(
+                            gradient='linear',
+                            stops=[alt.GradientStop(color='rgba(255,152,0,0.1)', offset=0),
+                                   alt.GradientStop(color='rgba(255,152,0,0.7)', offset=1)],
+                            x1=1, x2=1, y1=1, y2=0
+                        )
+                    ).encode(
+                        x=alt.X('fecha:T', title="Línea de Tiempo",
+                                axis=alt.Axis(format='%d/%m', labelAngle=-30)),
+                        y=alt.Y('cantidad:Q', title="N° de Operaciones",
+                                scale=alt.Scale(zero=True)),
+                        tooltip=[
+                            alt.Tooltip('fecha:T', title='Fecha', format='%d/%m/%Y'),
+                            alt.Tooltip('cantidad:Q', title='Transacciones')
+                        ]
+                    ).properties(height=300).interactive()
+
+                    st.altair_chart(chart_evolucion, use_container_width=True)
+                    st.caption(f"Datos reales: {len(df_hist)} días con actividad en el rango seleccionado.")
+
+                elif hist_res.get('status') != 200:
+                    st.error(f"Error al consultar datos: {hist_res.get('error')}")
+                else:
+                    st.info("💤 No hay transacciones registradas en el rango de fechas seleccionado.")
+
+            except Exception as e:
+                st.error(f"Error de base de datos en evolución temporal: {str(e)}")
 
         # --- 5. DETALLE TABULAR (SEGURO) ---
         with st.expander("📂 Explorar registros detallados"):
