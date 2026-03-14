@@ -87,11 +87,12 @@ def _get_masked_card_for_description(account_id: int) -> str | None:
 
 from datetime import datetime, timedelta
 
-def _get_random_past_date(days_back: int = 90) -> datetime:
+def _get_random_past_date(days_back: int = 89) -> datetime:
     """Genera una fecha aleatoria entre hoy y N días atrás."""
     random_days = random.randint(0, days_back)
     random_hours = random.randint(0, 23)
     random_minutes = random.randint(0, 59)
+    return datetime.now() - timedelta(days=random_days, hours=random_hours, minutes=random_minutes)
     
     past_date = datetime.now() - timedelta(days=random_days, hours=random_hours, minutes=random_minutes)
     return past_date
@@ -138,108 +139,74 @@ def _safe_debit_amount(account_id: int, cap: float = MAX_AMOUNT_AUTO) -> float |
 # ─────────────────────────────────────────────────────────────────────────
 # Fondeo inicial
 # ─────────────────────────────────────────────────────────────────────────
-
-def phase_initial_funding(accounts: list[dict], actor_id: int) -> None:
-    """Deposita un monto inicial en cada cuenta para garantizar fondos."""
-    print("\n── Fase 1: Fondeo inicial ──────────────────────────────")
+def phase_initial_funding(accounts: list[dict], fallback_actor_id: int) -> None:
+    print("\n── Fase 1: Fondeo inicial (Hace 90 días) ───────────────")
+    # Fijamos la fecha de apertura hace exactamente 90 días
+    opening_date = datetime.now() - timedelta(days=90) 
+    
     for acc in accounts:
         acc_id = acc["Id_account"]
+        owner_id = acc["user_id"]
         amount = _rand_amount(INITIAL_DEPOSIT_MIN, INITIAL_DEPOSIT_MAX)
-        desc   = random.choice(DEPOSIT_DESCRIPTIONS)
-
-        result = create_simple_transaction(
+        
+        create_simple_transaction(
             account_id=acc_id,
             amount=amount,
             entry_type=ENTRY_CREDIT,
-            description=f"[Fondeo inicial] {desc}",
-            created_by_user_id=actor_id,
-            transaction_type_id=3,   # Depósito
+            description="[Fondeo inicial] Depósito de apertura",
+            created_by_user_id=owner_id,
+            transaction_type_id=3,
+            created_at=opening_date  # <--- INYECTAMOS LA FECHA AQUÍ
         )
-        if result["success"]:
-            print(f"  ✅ Cuenta {acc_id} fondada con ${amount:,.2f}")
-        else:
-            print(f"  ❌ Cuenta {acc_id} — error: {result.get('error')}")
-
-
+    print(f"  ✅ {len(accounts)} cuentas fondeadas.")
 # ─────────────────────────────────────────────────────────────────────────
 # Transacciones aleatorias (CORREGIDO: Ahora recibe el owner_id)
 # ─────────────────────────────────────────────────────────────────────────
 
-def _do_transfer(from_id: int, owner_id: int, all_ids: list[int]) -> dict:
-    """Crea una transferencia siendo el dueño de la cuenta quien la ejecuta."""
+def _do_transfer(from_id: int, owner_id: int, all_ids: list[int], tx_date: datetime) -> dict:
     candidates = [i for i in all_ids if i != from_id]
-    if not candidates:
-        return {"success": False, "error": "No hay cuentas destino disponibles."}
-
-    to_id  = random.choice(candidates)
+    if not candidates: return {"success": False, "error": "No hay destino."}
+    to_id = random.choice(candidates)
     amount = _safe_debit_amount(from_id)
-    if amount is None:
-        return {"success": False, "error": "Fondos insuficientes."}
-
-    return create_transfer(
-        from_account_id=from_id,
-        to_account_id=to_id,
-        amount=amount,
-        description=random.choice(TRANSFER_DESCRIPTIONS),
-        created_by_user_id=owner_id, # <--- CAMBIO: El usuario dueño transacciona
-        transaction_type_id=1,
-    )
-
-def _do_withdrawal(acc_id: int, owner_id: int) -> dict:
-    """Cajero Automático: El dueño retira su dinero."""
-    amount = _safe_debit_amount(acc_id)
     if amount is None: return {"success": False, "error": "Fondos insuficientes."}
 
-    return create_simple_transaction(
-        account_id=acc_id,
-        amount=amount,
-        entry_type=ENTRY_DEBIT,
-        description=random.choice(WITHDRAWAL_DESCRIPTIONS),
-        created_by_user_id=owner_id, # <--- CAMBIO
-        transaction_type_id=2,
+    return create_transfer(
+        from_account_id=from_id, to_account_id=to_id, amount=amount,
+        description=random.choice(TRANSFER_DESCRIPTIONS),
+        created_by_user_id=owner_id, transaction_type_id=1,
+        created_at=tx_date # <--- AÑADIDO
     )
 
-def _do_deposit(acc_id: int, owner_id: int) -> dict:
+def _do_withdrawal(acc_id: int, owner_id: int, tx_date: datetime) -> dict:
+    amount = _safe_debit_amount(acc_id)
+    if amount is None: return {"success": False, "error": "Fondos."}
+    return create_simple_transaction(
+        account_id=acc_id, amount=amount, entry_type=ENTRY_DEBIT,
+        description=random.choice(WITHDRAWAL_DESCRIPTIONS),
+        created_by_user_id=owner_id, transaction_type_id=2,
+        created_at=tx_date # <--- AÑADIDO
+    )
+
+def _do_deposit(acc_id: int, owner_id: int, tx_date: datetime) -> dict:
     amount = _rand_amount(10.0, MAX_AMOUNT_AUTO)
     return create_simple_transaction(
-        account_id=acc_id,
-        amount=amount,
-        entry_type=ENTRY_CREDIT,
+        account_id=acc_id, amount=amount, entry_type=ENTRY_CREDIT,
         description=random.choice(DEPOSIT_DESCRIPTIONS),
-        created_by_user_id=owner_id, # <--- CAMBIO
-        transaction_type_id=3,
+        created_by_user_id=owner_id, transaction_type_id=3,
+        created_at=tx_date # <--- AÑADIDO
     )
 
-def _do_payment(acc_id: int, owner_id: int) -> dict:
-    """
-    Simula un pago de servicio utilizando la tarjeta vinculada a la cuenta.
-    """
-    # 1. Intentamos obtener la tarjeta (necesaria para el realismo del log)
+def _do_payment(acc_id: int, owner_id: int, tx_date: datetime) -> dict:
     card_info = _get_masked_card_for_description(acc_id)
-    
-    # 2. Si por alguna razón la cuenta no tiene tarjeta, fallamos la TX
-    # Esto ayuda a validar que el seed_cards corrió bien
-    if not card_info:
-        return {"success": False, "error": f"Cuenta {acc_id} no tiene tarjeta activa para pagos."}
-
-    # 3. Calculamos un monto lógico para servicios (capado a $500 para realismo)
+    if not card_info: return {"success": False, "error": "Sin tarjeta."}
     amount = _safe_debit_amount(acc_id, cap=500.0)
-    if amount is None: 
-        return {"success": False, "error": "Fondos insuficientes para cubrir el recibo."}
-
-    # 4. Construimos una descripción detallada
-    # Ejemplo: "Pago de electricidad (Visa: ****1234)"
-    service_name = random.choice(PAYMENT_DESCRIPTIONS)
-    full_description = f"{service_name} (Tarj: ****{card_info})"
-
-    # 5. Ejecutamos la transacción
+    if amount is None: return {"success": False, "error": "Fondos."}
+    
     return create_simple_transaction(
-        account_id=acc_id,
-        amount=amount,
-        entry_type=ENTRY_DEBIT,
-        description=full_description,
-        created_by_user_id=owner_id,
-        transaction_type_id=4,   # Tipo: Pago de Servicio
+        account_id=acc_id, amount=amount, entry_type=ENTRY_DEBIT,
+        description=f"{random.choice(PAYMENT_DESCRIPTIONS)} (Tarj: ****{card_info})",
+        created_by_user_id=owner_id, transaction_type_id=4,
+        created_at=tx_date # <--- AÑADIDO
     )
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -265,27 +232,30 @@ def phase_initial_funding(accounts: list[dict], fallback_actor_id: int) -> None:
     print(f"  ✅ {len(accounts)} cuentas fondeadas.")
 
 def phase_random_transactions(accounts: list[dict]) -> None:
-    """Genera transacciones distribuidas por usuario."""
     print("\n── Fase 2: Transacciones aleatorias ────────────────────")
     all_ids  = [a["Id_account"] for a in accounts]
     total_ok = 0
 
     for acc in accounts:
         acc_id = acc["Id_account"]
-        owner_id = acc["user_id"] # <--- IMPORTANTE: Recuperamos el dueño real
+        owner_id = acc["user_id"]
         n_tx = random.randint(TX_PER_ACCOUNT_MIN, TX_PER_ACCOUNT_MAX)
 
         for _ in range(n_tx):
             tx_type = random.choice([1, 2, 3, 4])
-            if tx_type == 1:   res = _do_transfer(acc_id, owner_id, all_ids)
-            elif tx_type == 2: res = _do_withdrawal(acc_id, owner_id)
-            elif tx_type == 3: res = _do_deposit(acc_id, owner_id)
-            else:              res = _do_payment(acc_id, owner_id)
+            
+            # Generamos una fecha entre hace 89 días y hoy
+            random_date = _get_random_past_date(days_back=89) 
+            
+            # Pasamos la fecha a los helpers
+            if tx_type == 1:   res = _do_transfer(acc_id, owner_id, all_ids, random_date)
+            elif tx_type == 2: res = _do_withdrawal(acc_id, owner_id, random_date)
+            elif tx_type == 3: res = _do_deposit(acc_id, owner_id, random_date)
+            else:              res = _do_payment(acc_id, owner_id, random_date)
 
             if res["success"]: total_ok += 1
 
-    print(f"  ✅ Seed finalizado: {total_ok} transacciones reales creadas.")
-
+    print(f"  ✅ Seed finalizado: {total_ok} transacciones reales creadas con histórico de 90 días.")
 if __name__ == "__main__":
     # 1. Obtener cuentas (ya traen el user_id)
     accounts = _get_active_accounts()

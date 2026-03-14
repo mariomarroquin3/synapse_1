@@ -23,7 +23,7 @@ CREDIT = "credit"
 
 
 def create_ledger_entry(cursor: Any, transaction_id: int, account_id: int,
-                        amount: float, entry_type: str) -> int:
+                        amount: float, entry_type: str, created_at: datetime | None = None) -> int:
     """
     Inserta un registro en ledger_entry usando un cursor existente.
     
@@ -36,6 +36,7 @@ def create_ledger_entry(cursor: Any, transaction_id: int, account_id: int,
         account_id     : FK a account.Id_account
         amount         : Monto del movimiento (siempre positivo)
         entry_type     : 'debit' o 'credit'
+        created_at     : Fecha del movimiento (opcional, default: ahora)
 
     Returns:
         Id del registro insertado.
@@ -55,12 +56,12 @@ def create_ledger_entry(cursor: Any, transaction_id: int, account_id: int,
         VALUES (?, ?, ?, ?, ?)
     """
 
-    created_at = datetime.now()
+    tx_date = created_at or datetime.now()
 
     print(f"[LEDGER] Insertando entrada → tx={transaction_id}, cuenta={account_id}, "
-          f"monto={amount}, tipo={entry_type}, fecha={created_at}")
+          f"monto={amount}, tipo={entry_type}, fecha={tx_date}")
 
-    cursor.execute(sql, (transaction_id, account_id, entry_type, amount, created_at))
+    cursor.execute(sql, (transaction_id, account_id, entry_type, amount, tx_date))
 
     # Access no soporta RETURNING; usamos @@IDENTITY para obtener el último ID generado
     cursor.execute("SELECT @@IDENTITY")

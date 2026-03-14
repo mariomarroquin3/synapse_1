@@ -1221,7 +1221,10 @@ if role_id == 5:
     st.header("Control de Riesgos - Auditor")
     st.write("Historial Detallado de Operaciones del Sistema. (Solo Lectura)")
 
-    tab_admin, tab_ops = st.tabs(["Historial Administrativo", "Historial de Transacciones"])
+    from services.transaction_service import get_all_account_history
+    import altair as alt
+
+    tab_admin, tab_ops, tab_acc = st.tabs(["Historial Administrativo", "Historial de Transacciones", "📊 Auditoría de Cuentas"])
 
     # --- TAB 1: Historial Administrativo ---
     with tab_admin:
@@ -1449,3 +1452,66 @@ if role_id == 5:
                 st.info("No se encontraron registros de transacciones.")
         except Exception as e:
             st.error(f"Error crítico al cargar historial de transacciones: {e}")
+
+    # --- TAB 3: Auditoría de Cuentas ---
+    with tab_acc:
+        st.subheader("Auditoría de Cuentas")
+        st.write("Consulta la evolución del saldo de cualquier cuenta del sistema.")
+        
+        @st.cache_data(ttl=60)
+        def _get_all_accounts_for_auditor():
+            with get_cursor() as cursor:
+                # Obtenemos id, número de cuenta y el nombre descriptivo del usuario para el selectbox
+                cursor.execute("SELECT a.Id_account, a.account_number, u.full_name FROM account a INNER JOIN [user] u ON a.user_id = u.Id_user ORDER BY u.full_name")
+                rows = cursor.fetchall()
+                return [{"id": r[0], "num": r[1], "name": r[2]} for r in rows] if rows else []
+        
+        all_accounts = _get_all_accounts_for_auditor()
+        
+        if not all_accounts:
+            st.info("No hay cuentas registradas en el sistema.")
+        else:
+            # Diccionario para el Selectbox: {ID: "Nombre - Número de cuenta"}
+            acc_opts = {a["id"]: f"{a['name']} - {a['num']}" for a in all_accounts}
+            selected_acc_id = st.selectbox(
+                "Seleccione una cuenta para auditar",
+                options=list(acc_opts.keys()),
+                format_func=lambda x: acc_opts[x],
+                index=0
+            )
+            
+            if selected_acc_id:
+                st.divider()
+                st.markdown("### 📈 Evolución del Saldo General")
+                
+                history = get_all_account_history(selected_acc_id)
+                
+                if history:
+                    # Calcular el saldo acumulado (running total)
+                    df_ev = pd.DataFrame([
+                        {"fecha": tx["date"], "monto": tx["amount"] if tx["entry_type"] == "credit" else -tx["amount"]}
+                        for tx in sorted(history, key=lambda x: x["date"])
+                    ])
+                    df_ev["saldo"] = df_ev["monto"].cumsum()
+                    
+                    # Gráfico de Área igual al del Usuario
+                    chart_saldo_aud = alt.Chart(df_ev).mark_area(
+                        line={'color':'#10B981'},
+                        color=alt.Gradient(
+                            gradient='linear',
+                            stops=[alt.GradientStop(color='rgba(16, 185, 129, 0.1)', offset=0),
+                                   alt.GradientStop(color='rgba(16, 185, 129, 0.7)', offset=1)],
+                            x1=1, x2=1, y1=1, y2=0
+                        )
+                    ).encode(
+                        x=alt.X("fecha:T", title="Fecha"),
+                        y=alt.Y("saldo:Q", title="Saldo ($)", scale=alt.Scale(zero=False)),
+                        tooltip=[
+                            alt.Tooltip("fecha:T", title="Fecha", format="%d/%m/%Y %H:%M"),
+                            alt.Tooltip("saldo:Q", title="Saldo Disponible", format=",.2f")
+                        ]
+                    ).properties(height=350).interactive()
+                    
+                    st.altair_chart(chart_saldo_aud, use_container_width=True)
+                else:
+                    st.info("Esta cuenta no tiene ninguna transacción o movimiento registrado aún.")

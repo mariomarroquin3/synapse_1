@@ -20,15 +20,15 @@ LIMIT_AUTO_APPROVE = 10000.0
 # ─────────────────────────────────────────────
 
 def _insert_transaction(cursor: Any, transaction_type_id: int, status_id: int,
-                        description: str, created_by_user_id: int) -> int:
+                        description: str, created_by_user_id: int, created_at: datetime | None = None) -> int:
     """Inserta el registro principal en la tabla transaction y retorna su ID."""
     sql = """
         INSERT INTO [transaction]
             (transaction_type_id, status_id, description, created_by_user_id, transaction_date, processed_at)
         VALUES (?, ?, ?, ?, ?, ?)
     """
-    now = datetime.now()
-    cursor.execute(sql, (transaction_type_id, status_id, description, created_by_user_id, now, now))
+    tx_date = created_at or datetime.now()
+    cursor.execute(sql, (transaction_type_id, status_id, description, created_by_user_id, tx_date, tx_date))
     
     cursor.execute("SELECT @@IDENTITY")
     result = cursor.fetchone()
@@ -121,7 +121,8 @@ def get_account_balance(account_id: int) -> float:
 def create_transfer(from_account_id: int, to_account_id: int,
                     amount: float, description: str,
                     created_by_user_id: int,
-                    transaction_type_id: int = 1) -> dict[str, Any]:
+                    transaction_type_id: int = 1,
+                    created_at: datetime | None = None) -> dict[str, Any]:
     """
     Crea una transferencia bancaria con lógica de límite de aprobación.
     
@@ -135,6 +136,7 @@ def create_transfer(from_account_id: int, to_account_id: int,
         description: Descripción de la transferencia
         created_by_user_id: Usuario que crea la transferencia
         transaction_type_id: Tipo de transacción (default=1)
+        created_at: Fecha de la transacción histórica (opcional, default: ahora)
         
     Returns:
         dict: {'success': bool, 'transaction_id': int, 'requires_approval': bool, 'error': str}
@@ -177,11 +179,11 @@ def create_transfer(from_account_id: int, to_account_id: int,
             print(f"[TX_SERVICE] Monto ${amount} <= Límite ${LIMIT_AUTO_APPROVE}. Aprobación automática.")
             
             status_id = 3  # Finalizada
-            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, description, created_by_user_id)
+            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, description, created_by_user_id, created_at=created_at)
             
             # Inserta inmediatamente en ledger
-            create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=from_account_id, amount=amount, entry_type=DEBIT)
-            create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=to_account_id, amount=amount, entry_type=CREDIT)
+            create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=from_account_id, amount=amount, entry_type=DEBIT, created_at=created_at)
+            create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=to_account_id, amount=amount, entry_type=CREDIT, created_at=created_at)
             
             conn.commit()
             return {
@@ -196,7 +198,7 @@ def create_transfer(from_account_id: int, to_account_id: int,
             print(f"[TX_SERVICE] Monto ${amount} > Límite ${LIMIT_AUTO_APPROVE}. Requiere aprobación.")
             
             status_id = 2  # Pendiente
-            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, description, created_by_user_id)
+            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, description, created_by_user_id, created_at=created_at)
             
             # NO inserta en ledger, pero sí registra en transaction_approvals
             sql_approval = """
@@ -204,8 +206,8 @@ def create_transfer(from_account_id: int, to_account_id: int,
                     (transaction_id, from_account_id, to_account_id, amount, created_at)
                 VALUES (?, ?, ?, ?, ?)
             """
-            now = datetime.now()
-            cursor.execute(sql_approval, (tx_id, from_account_id, to_account_id, amount, now))
+            tx_date = created_at or datetime.now()
+            cursor.execute(sql_approval, (tx_id, from_account_id, to_account_id, amount, tx_date))
             print(f"[TX_SERVICE] Registro de aprobación insertado para transacción {tx_id}")
             
             conn.commit()
@@ -233,12 +235,16 @@ def create_simple_transaction(account_id: int, amount: float,
                                transaction_type_id: int, 
                                status_id: int = 3,
                                card_number: str | None = None,
-                               pin: str | None = None) -> dict[str, Any]:
+                               pin: str | None = None,
+                               created_at: datetime | None = None) -> dict[str, Any]:
     """
     Crea una transacción simple (depósito, retiro, pago con tarjeta, etc).
     
     Si card_number se proporciona, valida la tarjeta antes de procesar.
     Si se usó tarjeta, se añaden los últimos 4 dígitos a la descripción.
+    
+    Args:
+        created_at: Fecha de la transacción histórica (opcional, default: ahora)
     
     Returns:
         dict: {'success': bool, 'transaction_id': int | None, 'requires_approval': bool, 'error': str}
@@ -294,7 +300,7 @@ def create_simple_transaction(account_id: int, amount: float,
         if amount >= 10000.0:
             print(f"[TX_SERVICE] Monto ${amount} >= $10,000. Requiere aprobación manual.")
             status_id = 2  # Pendiente
-            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, final_description, created_by_user_id)
+            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, final_description, created_by_user_id, created_at=created_at)
             
             # Registrar en tabla de aprobaciones
             # Para transacciones simples, from_account_id o to_account_id se repiten según el tipo
@@ -304,9 +310,10 @@ def create_simple_transaction(account_id: int, amount: float,
             sql_approval = """
                 INSERT INTO transaction_approvals
                     (transaction_id, from_account_id, to_account_id, amount, created_at)
-                VALUES (?, ?, ?, ?, Now())
+                VALUES (?, ?, ?, ?, ?)
             """
-            cursor.execute(sql_approval, (tx_id, from_acc, to_acc, amount))
+            tx_date = created_at or datetime.now()
+            cursor.execute(sql_approval, (tx_id, from_acc, to_acc, amount, tx_date))
             conn.commit()
             
             return {
@@ -318,8 +325,8 @@ def create_simple_transaction(account_id: int, amount: float,
         
         else:
             # Transacción normal
-            tx_id = _insert_transaction(cursor, transaction_type_id, 3, final_description, created_by_user_id)
-            create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=entry_type)
+            tx_id = _insert_transaction(cursor, transaction_type_id, 3, final_description, created_by_user_id, created_at=created_at)
+            create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=entry_type, created_at=created_at)
             conn.commit()
             return {"success": True, "transaction_id": tx_id, "requires_approval": False}
 

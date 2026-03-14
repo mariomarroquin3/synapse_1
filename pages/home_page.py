@@ -265,6 +265,52 @@ elif menu == "Historial de Movimientos":
 
             st.divider()
 
+            # --- GRÁFICO DE SALDO EVOLUTIVO ---
+            import altair as alt
+            import pandas as pd
+
+            st.markdown("### 📈 Evolución del Saldo")
+            if all_history:
+                # Calcular saldo acumulado ordenando desde el inicio para precisión
+                df_ev = pd.DataFrame([
+                    {"fecha": tx["date"], "monto": tx["amount"] if tx["entry_type"] == "credit" else -tx["amount"]}
+                    for tx in sorted(all_history, key=lambda x: x["date"])
+                ])
+                df_ev["saldo"] = df_ev["monto"].cumsum()
+
+                # Filtrar el DataFrame para la visualización si hay fechas aplicadas
+                df_plot = df_ev.copy()
+                if apply_filter and len(date_range) == 2:
+                    start_d, end_d = date_range
+                    df_plot['fecha_solo'] = pd.to_datetime(df_plot['fecha']).dt.date
+                    df_plot = df_plot[(df_plot['fecha_solo'] >= start_d) & (df_plot['fecha_solo'] <= end_d)]
+                
+                if not df_plot.empty:
+                    chart_saldo = alt.Chart(df_plot).mark_area(
+                        line={'color':'#10B981'},
+                        color=alt.Gradient(
+                            gradient='linear',
+                            stops=[alt.GradientStop(color='rgba(16, 185, 129, 0.1)', offset=0),
+                                   alt.GradientStop(color='rgba(16, 185, 129, 0.7)', offset=1)],
+                            x1=1, x2=1, y1=1, y2=0
+                        )
+                    ).encode(
+                        x=alt.X("fecha:T", title="Fecha"),
+                        y=alt.Y("saldo:Q", title="Saldo ($)", scale=alt.Scale(zero=False)),
+                        tooltip=[
+                            alt.Tooltip("fecha:T", title="Fecha", format="%d/%m/%Y %H:%M"),
+                            alt.Tooltip("saldo:Q", title="Saldo Disponible", format=",.2f")
+                        ]
+                    ).properties(height=300).interactive()
+                    
+                    st.altair_chart(chart_saldo, use_container_width=True)
+                else:
+                    st.info("Sin registros de saldo para el periodo filtrado.")
+            else:
+                st.info("No hay datos suficientes para mostrar la evolución del saldo.")
+
+            st.divider()
+
             # --- RENDERIZADO DE MOVIMIENTOS ---
             # Diccionario para nombres amigables
             type_names = {
