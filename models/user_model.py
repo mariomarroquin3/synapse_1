@@ -85,6 +85,21 @@ def get_user_by_phone(phone_number: str):
             return dict(zip([col[0] for col in cursor.description], row))
         return None
 
+def get_user_by_nit(nit: str):
+    """
+    Retorna un usuario por NIT como un diccionario.
+    Útil para validar duplicados antes de insertar.
+    Devuelve None si no existe.
+    """
+    print(f"[DEBUG] Buscando usuario por NIT: {nit}")
+    query = "SELECT * FROM [user] WHERE NIT = ?"
+    with get_cursor() as cursor:
+        cursor.execute(query, (nit,))
+        row = cursor.fetchone()
+        if row:
+            return dict(zip([col[0] for col in cursor.description], row))
+        return None
+
 def get_user_by_id(user_id: int):
     """
     Retorna un usuario por ID como un diccionario.

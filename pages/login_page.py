@@ -13,7 +13,8 @@ from models.user_model import (
     create_user, 
     get_user_by_email, 
     get_user_by_dui,
-    get_user_by_phone
+    get_user_by_phone,
+    get_user_by_nit
 )
 from services.account_service import create_account_for_user
 from utils.security import hash_password, verify_password
@@ -173,21 +174,27 @@ with tab_reg:
                 st.warning("Faltan datos requeridos o formato inválido.")
             else:
                 try:
-                    if get_user_by_email(r_email): 
-                        st.error("Email ya registrado.")
-                    else:
                         # Aplicar formato a DUI y Teléfono
                         dui_f = f"{clean_dui[:8]}-{clean_dui[8:]}" if len(clean_dui) == 9 else clean_dui
                         tel_f = f"+503 {clean_tel[:4]}-{clean_tel[4:]}" if len(clean_tel) == 8 else clean_tel
                         nit_f = f"{clean_nit[:8]}-{clean_nit[8:]}" if clean_nit and len(clean_nit) == 9 else (r_nit_raw if r_nit_raw else None)
                         
-                        h = hash_password(r_pass)
-                        u_id = create_user(2, r_email, h, nit_f, dui_f, clean_name, r_gen[0], tel_f)
-                        create_account_for_user(u_id, "USD")
-                        st.success("¡Bienvenido a Synapse!")
-                        st.balloons()
-                        time.sleep(2)
-                        st.rerun()
+                        if get_user_by_email(r_email): 
+                            st.error("Email ya registrado.")
+                        elif get_user_by_phone(tel_f):
+                            st.error("Número de teléfono ya registrado.")
+                        elif get_user_by_dui(dui_f):
+                            st.error("DUI ya registrado.")
+                        elif nit_f and get_user_by_nit(nit_f):
+                            st.error("NIT ya registrado.")
+                        else:
+                            h = hash_password(r_pass)
+                            u_id = create_user(2, r_email, h, nit_f, dui_f, clean_name, r_gen[0], tel_f)
+                            create_account_for_user(u_id, "USD")
+                            st.success("¡Bienvenido a Synapse!")
+                            st.balloons()
+                            time.sleep(2)
+                            st.rerun()
                 except Exception as e: 
                     st.error(f"Error en el servidor: {e}")
 
