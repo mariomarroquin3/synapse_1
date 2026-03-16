@@ -17,7 +17,7 @@ from models.user_model import (
     get_user_by_nit
 )
 from services.account_service import create_account_for_user
-from utils.security import hash_password, verify_password
+from utils.security import hash_password, verify_password, validate_password
 from utils.ui_components import apply_premium_style
 from models.account_model import get_account_by_user
 
@@ -158,8 +158,47 @@ with tab_reg:
             r_conf = st.text_input("Confirmar", type="password", placeholder="Repite tu clave")
             r_gen = st.selectbox("Género", ["Masculino", "Femenino"])
         
+        # ═══════════════════════════════════════════════════════════════════════
+        # VALIDACIÓN DE CONTRASEÑA EN TIEMPO REAL
+        # ═══════════════════════════════════════════════════════════════════════
+        if r_pass:
+            is_valid, missing_reqs = validate_password(r_pass)
+            
+            if is_valid:
+                st.success("✅ Contraseña cumple todos los requisitos")
+            else:
+                # Mostrar requisitos faltantes
+                with st.expander("📋 Requisitos de seguridad", expanded=not is_valid):
+                    for requirement in missing_reqs:
+                        st.warning(f"❌ {requirement}")
+                    
+                    # Mostrar requisitos cumplidos
+                    st.markdown("**Requisitos cumplidos:**")
+                    all_reqs = [
+                        ("Mínimo 8 caracteres", len(r_pass) >= 8),
+                        ("Al menos una MAYÚSCULA", bool(re.search(r'[A-Z]', r_pass))),
+                        ("Al menos una minúscula", bool(re.search(r'[a-z]', r_pass))),
+                        ("Al menos un número", bool(re.search(r'[0-9]', r_pass))),
+                        ("Carácter especial (!@#$%^&*)", bool(re.search(r'[!@#$%^&*]', r_pass)))
+                    ]
+                    
+                    for req_text, is_met in all_reqs:
+                        if is_met:
+                            st.write(f"✅ {req_text}")
+        
         st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
-        btn_reg = st.form_submit_button("REGISTRARME AHORA", type="primary")
+        
+        # Validación de contraseña para determinar si el botón se habilita
+        password_is_valid = False
+        if r_pass and r_conf:
+            password_is_valid, _ = validate_password(r_pass)
+        
+        # Botón deshabilitado si la contraseña no es válida
+        btn_reg = st.form_submit_button(
+            "REGISTRARME AHORA", 
+            type="primary",
+            disabled=not password_is_valid and len(r_pass) > 0
+        )
 
         if btn_reg:
             # Limpieza manual post-submit (Evita errores de Streamlit Form)
@@ -174,6 +213,12 @@ with tab_reg:
                 st.warning("Faltan datos requeridos o formato inválido.")
             else:
                 try:
+                        # Validación final de contraseña ANTES de hashing
+                        is_valid, missing = validate_password(r_pass)
+                        if not is_valid:
+                            st.error("❌ La contraseña no cumple los requisitos de seguridad.")
+                            st.stop()
+                        
                         # Aplicar formato a DUI y Teléfono
                         dui_f = f"{clean_dui[:8]}-{clean_dui[8:]}" if len(clean_dui) == 9 else clean_dui
                         tel_f = f"+503 {clean_tel[:4]}-{clean_tel[4:]}" if len(clean_tel) == 8 else clean_tel
@@ -188,6 +233,7 @@ with tab_reg:
                         elif nit_f and get_user_by_nit(nit_f):
                             st.error("NIT ya registrado.")
                         else:
+                            # ✅ Hash AFTER validation passes
                             h = hash_password(r_pass)
                             u_id = create_user(2, r_email, h, nit_f, dui_f, clean_name, r_gen[0], tel_f)
                             create_account_for_user(u_id, "USD")

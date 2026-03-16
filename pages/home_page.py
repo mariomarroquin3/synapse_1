@@ -12,7 +12,9 @@ from models.account_model import get_accounts_by_user, get_account_by_number, cr
 from models.card_model import get_cards_by_account, is_card_near_expiration, check_pending_renewal, request_card_renewal
 from services.transaction_service import get_account_balance, get_all_account_history, create_transfer, process_card_payment
 from services.card_service import update_card_active_status, create_card_for_account
+from services.auth_service import change_password
 from utils.card_generator import generate_luhn_card_number
+from utils.security import validate_password
 from config.database import get_connection
 from utils.ui_components import apply_premium_style
 from utils.pdf_generator import generate_card_pdf
@@ -573,7 +575,73 @@ elif menu == "Mi Perfil":
     st.write(f"**DUI:** {user['DUI']}")
 
     st.divider()
-    st.markdown("### 📄 Generar Estado de Cuenta PDF")
+    st.markdown("### � Cambiar Contraseña")
+    
+    with st.expander("Cambiar tu contraseña de acceso", expanded=False):
+        # Input fields OUTSIDE form for real-time validation
+        current_pass = st.text_input("Contraseña Actual", type="password", placeholder="Ingresa tu contraseña actual", key="curr_pass")
+        new_pass = st.text_input("Nueva Contraseña", type="password", placeholder="Ingresa una nueva contraseña", key="new_pass")
+        confirm_pass = st.text_input("Confirmar Nueva Contraseña", type="password", placeholder="Confirma tu nueva contraseña", key="conf_pass")
+        
+        # Real-time validation feedback for new password (OUTSIDE form)
+        if new_pass:
+            is_valid, missing_reqs = validate_password(new_pass)
+            if is_valid:
+                st.success("✅ Contraseña cumple todos los requisitos de seguridad")
+            else:
+                with st.expander("📋 Requisitos faltantes:"):
+                    for requirement in missing_reqs:
+                        st.warning(f"❌ {requirement}")
+        
+        # Password confirmation check
+        if new_pass and confirm_pass:
+            if new_pass != confirm_pass:
+                st.error("❌ Las contraseñas no coinciden")
+            else:
+                st.success("✅ Las contraseñas coinciden")
+        elif confirm_pass and not new_pass:
+            st.warning("⚠️ Ingresa la nueva contraseña primero")
+        
+        # Calculate button state
+        password_is_valid = False
+        if new_pass:
+            password_is_valid, _ = validate_password(new_pass)
+        
+        button_disabled = not (current_pass and new_pass and confirm_pass and password_is_valid and new_pass == confirm_pass)
+        
+        # Submit button (OUTSIDE form for proper state handling)
+        st.divider()
+        if st.button(
+            "🔄 Cambiar Contraseña",
+            type="primary",
+            use_container_width=True,
+            disabled=button_disabled
+        ):
+            # Validation before processing
+            is_valid, missing_reqs = validate_password(new_pass)
+            
+            if not current_pass:
+                st.error("❌ Debes ingresar tu contraseña actual")
+            elif not new_pass or not confirm_pass:
+                st.error("❌ Debes ingresar y confirmar la nueva contraseña")
+            elif new_pass != confirm_pass:
+                st.error("❌ Las contraseñas no coinciden")
+            elif not is_valid:
+                missing_text = ", ".join(missing_reqs)
+                st.error(f"❌ La nueva contraseña no cumple los requisitos: {missing_text}")
+            else:
+                # Process password change
+                success, message = change_password(user["Id_user"], current_pass, new_pass)
+                if success:
+                    st.success("✅ Contraseña actualizada exitosamente")
+                    st.info("Por favor, inicia sesión nuevamente con tu nueva contraseña")
+                    time.sleep(2)
+                    st.switch_page("pages/login_page.py")
+                else:
+                    st.error(f"❌ {message}")
+
+    st.divider()
+    st.markdown("### �📄 Generar Estado de Cuenta PDF")
 
     if account["Id_account"]:
         all_history = get_all_account_history(account["Id_account"])

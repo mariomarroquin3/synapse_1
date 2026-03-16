@@ -174,3 +174,20 @@ def update_user_role(user_id: int, role_id: int) -> bool:
     with get_cursor(commit=True) as cursor:
         cursor.execute(query, (role_id, user_id))
         return cursor.rowcount > 0
+
+
+def update_user_password(user_id: int, new_password_hash: str) -> bool:
+    """
+    Actualiza la contraseña de un usuario.
+    
+    Args:
+        user_id: ID del usuario
+        new_password_hash: Hash bcrypt de la nueva contraseña
+        
+    Returns:
+        True si se actualizó; False si no se encontró el usuario
+    """
+    query = "UPDATE [user] SET password_hash = ?, updated_at = Now() WHERE Id_user = ?"
+    with get_cursor(commit=True) as cursor:
+        cursor.execute(query, (new_password_hash, user_id))
+        return cursor.rowcount > 0

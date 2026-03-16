@@ -87,7 +87,7 @@ def _get_masked_card_for_description(account_id: int) -> str | None:
 
 from datetime import datetime, timedelta
 
-def _get_random_past_date(days_back: int = 89) -> datetime:
+def _get_random_past_date(days_back: int = 15) -> datetime:
     """Genera una fecha aleatoria entre hoy y N días atrás."""
     random_days = random.randint(0, days_back)
     random_hours = random.randint(0, 23)
@@ -225,7 +225,7 @@ def phase_initial_funding(accounts: list[dict], fallback_actor_id: int) -> None:
             account_id=acc_id,
             amount=amount,
             entry_type=ENTRY_CREDIT,
-            description="[Fondeo inicial] Depósito de apertura",
+            description="Depósito rutinario",
             created_by_user_id=owner_id, # El usuario 'abre' su cuenta
             transaction_type_id=3,
         )
@@ -245,7 +245,7 @@ def phase_random_transactions(accounts: list[dict]) -> None:
             tx_type = random.choice([1, 2, 3, 4])
             
             # Generamos una fecha entre hace 89 días y hoy
-            random_date = _get_random_past_date(days_back=89) 
+            random_date = _get_random_past_date(days_back=15) 
             
             # Pasamos la fecha a los helpers
             if tx_type == 1:   res = _do_transfer(acc_id, owner_id, all_ids, random_date)
