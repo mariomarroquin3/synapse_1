@@ -154,9 +154,20 @@ def apply_premium_style():
             margin: 1.5rem 0 !important;
         }
         
-        /* Metric custom hiding default */
-        div[data-testid="stMetric"] {
-            display: none !important;
+        /* Estilo Premium para st.metric */
+        [data-testid="stMetricLabel"] p {
+            font-size: 0.9rem !important;
+            font-weight: 500 !important;
+            color: var(--text-secondary) !important;
+            letter-spacing: 0.5px !important;
+        }
+        [data-testid="stMetricValue"] {
+            font-size: 2rem !important;
+            font-weight: 700 !important;
+            color: var(--text-primary) !important;
+        }
+        [data-testid="stMetricDelta"] svg {
+            fill: var(--primary) !important;
         }
 
         /* Scrollbar Personalizada */
