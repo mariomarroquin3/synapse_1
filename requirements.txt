@@ -3,3 +3,4 @@ pyodbc
 python-dotenv
 bcrypt
 reportlab
+streamlit-option-menu

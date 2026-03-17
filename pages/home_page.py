@@ -16,10 +16,11 @@ from services.auth_service import change_password
 from utils.card_generator import generate_luhn_card_number
 from utils.security import validate_password
 from config.database import get_connection
-from utils.ui_components import apply_premium_style
+from utils.ui_components import apply_premium_style, render_dashboard_card
 from utils.pdf_generator import generate_card_pdf
 from card_print.generate_card_pdf import generate_card_pdf as generate_card_pdf2
 from card_print.user_pdf import generate_account_statement_pdf
+from streamlit_option_menu import option_menu
 
 # --- 3. CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Banca en Línea - Synapse", layout="wide")
@@ -70,20 +71,53 @@ def logout():
     st.session_state.user_data = None
     st.switch_page("pages/login_page.py")
 
-# --- VISTA DE CABECERA ---
-head_col1, head_col2 = st.columns([3, 1])
-with head_col1:
-    st.markdown(f"## Bienvenido, {user.get('full_name', 'Usuario')}")
-    dui_display = user.get('DUI', user.get('dui', 'N/A'))
-    st.caption(f"DUI: {dui_display} | Cuenta: {account.get('account_number', 'N/A')}")
-with head_col2:
-    if st.button("Cerrar Sesión", type="secondary"):
+# --- LOGICA DE NAVEGACION (Manejado en Sidebar) ---
+
+with st.sidebar:
+    st.markdown("""
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 30px; margin-top: -10px;">
+        <div style="background: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; justify-content: center; align-items: center;">
+            <svg fill="white" width="20" height="20" viewBox="0 0 24 24"><path d="M4 10h3v7H4zM10.5 10h3v7h-3zM2 19h20v3H2zM17 10h3v7h-3zM12 1L2 6v2h20V6z"/></svg>
+        </div>
+        <div>
+            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; letter-spacing: 1px; color: white;">SYNAPSE</h3>
+            <p style="margin: 0; font-size: 0.65rem; color: var(--text-secondary); letter-spacing: 1px;">PRIVATE BANKING</p>
+        </div>
+    </div>
+    
+    <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 30px;">
+        <img src="https://ui-avatars.com/api/?name={av_name}&background=2D2D35&color=fff&bold=true" style="width: 40px; height: 40px; border-radius: 50%;" />
+        <div style="overflow: hidden;">
+            <p style="margin: 0; font-weight: 600; font-size: 0.9rem; color: white; text-overflow: ellipsis; white-space: nowrap;">{full_name}</p>
+            <p style="margin: 0; font-size: 0.75rem; color: var(--text-secondary);">User</p>
+        </div>
+    </div>
+    """.format(av_name=user.get('full_name', 'U').replace(" ", "+"), full_name=user.get('full_name', 'Usuario')), unsafe_allow_html=True)
+    
+    menu = option_menu(
+        menu_title=None,
+        options=["Resumen", "Transferencias", "Cajero Automático", "Tarjetas", "Pago de Servicios", "Historial", "Ajustes"],
+        icons=["grid-fill", "send-fill", "bank2", "credit-card-fill", "wallet-fill", "clock-history", "gear-fill"],
+        menu_icon="cast",
+        default_index=0,
+        styles={
+            "container": {"padding": "0!important", "background-color": "transparent"},
+            "icon": {"color": "var(--text-secondary)", "font-size": "18px"},
+            "nav-link": {
+                "font-size": "14px", "text-align": "left", "margin": "0px", 
+                "color": "var(--text-secondary)", "padding": "12px 20px", "border-radius": "12px", "font-weight": "500"
+            },
+            "nav-link-selected": {
+                "background-color": "rgba(37, 99, 235, 0.1)", "color": "white",
+                "border": "1px solid rgba(37, 99, 235, 0.2)",
+                "font-weight": "600"
+            },
+        }
+    )
+    
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    if st.button("Cerrar Sesión", type="secondary", use_container_width=True):
         logout()
-
-st.divider()
-
-# Menú de Navegación
-menu = st.sidebar.radio("MENÚ PRINCIPAL", ["Resumen", "Transferencias", "Pago de Servicios", "Mis Tarjetas", "Historial de Movimientos", "Mi Perfil"])
 
 # --- SELECTOR DE CUENTAS (SIDEBAR) ---
 st.sidebar.divider()
@@ -144,17 +178,27 @@ if estado_actual == 2:
     st.error("⚠️ **Cuenta Bloqueada:** Solo se permiten depósitos entrantes. Las transferencias y pagos están deshabilitados.")
 
 
-# --- BOTÓN DE CAJERO ---
-st.sidebar.divider()
-if st.sidebar.button("🏧 CAJERO", width="stretch", type="primary"):
+# --- MENU ROUTING ---
+if menu == "Cajero Automático":
     st.switch_page("pages/atm_simulator.py")
 
-if menu == "Resumen":
+elif menu == "Resumen":
     balance = get_account_balance(account["Id_account"]) if account["Id_account"] else 0.0
-    st.metric("Saldo Disponible", f"$ {balance:,.2f} {account['currency']}")
+    st.markdown(f'<p style="color: var(--text-secondary); margin-bottom: 0;">Bienvenido de nuevo,</p><h1 style="margin-top: -10px; margin-bottom: 30px; font-weight: 800; font-size: 2.2rem; color: white;">{user.get("full_name", "Usuario")}</h1>', unsafe_allow_html=True)
+    render_dashboard_card(balance, account.get("account_number", "Sin cuenta"))
 
 elif menu == "Transferencias":
-    st.subheader("Transferencias a Terceros")
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+            <div style="background: rgba(37, 99, 235, 0.15); width: 48px; height: 48px; border-radius: 14px; display: flex; justify-content: center; align-items: center; border: 1px solid rgba(37, 99, 235, 0.3);">
+                <svg width="24" height="24" fill="var(--primary)" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+                <h2 style="margin: 0; font-weight: 700; color: white;">Transferencias a Terceros</h2>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">Envía dinero de forma rápida y segura.</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
     if not account["Id_account"]:
         st.warning("No tienes una cuenta bancaria asociada para hacer transferencias.")
     else:
@@ -218,8 +262,18 @@ elif menu == "Transferencias":
                             else:
                                 st.error("No se pudo identificar el ID de la cuenta destino.")
 
-elif menu == "Historial de Movimientos":
-    st.subheader("Historial de Movimientos")
+elif menu == "Historial":
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+            <div style="background: rgba(16, 185, 129, 0.15); width: 48px; height: 48px; border-radius: 14px; display: flex; justify-content: center; align-items: center; border: 1px solid rgba(16, 185, 129, 0.3);">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#10B981"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+                <h2 style="margin: 0; font-weight: 700; color: white;">Historial de Movimientos</h2>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">Revisa tus ingresos y egresos recientes.</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
     if not account["Id_account"]:
         st.warning("No tienes una cuenta bancaria asociada para ver el historial.")
@@ -393,8 +447,18 @@ elif menu == "Historial de Movimientos":
         else:
             st.info("No tienes movimientos registrados todavía.")
 
-elif menu == "Mis Tarjetas":
-    st.subheader("Gestión de Tarjetas")
+elif menu == "Tarjetas":
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+            <div style="background: rgba(249, 115, 22, 0.15); width: 48px; height: 48px; border-radius: 14px; display: flex; justify-content: center; align-items: center; border: 1px solid rgba(249, 115, 22, 0.3);">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#F97316"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+            </div>
+            <div>
+                <h2 style="margin: 0; font-weight: 700; color: white;">Gestión de Tarjetas</h2>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">Administra tus tarjetas activas y solicita nuevas.</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
     if not account["Id_account"]:
         st.warning("No tienes una cuenta bancaria asociada.")
     else:
@@ -567,7 +631,7 @@ elif menu == "Mis Tarjetas":
                                 else:
                                     st.error(f"Error: {result.get('error')}")
 
-elif menu == "Mi Perfil":
+elif menu == "Ajustes":
     st.subheader("Información Personal")
     st.write(f"**Nombre:** {user['full_name']}")
     st.write(f"**Email:** {user['email']}")
@@ -732,7 +796,17 @@ elif menu == "Mi Perfil":
         st.warning("No tienes una cuenta asociada para generar el estado de cuenta.")                                 
 
 elif menu == "Pago de Servicios":
-    st.subheader("Pago de Servicios con Tarjeta")
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+            <div style="background: rgba(168, 85, 247, 0.15); width: 48px; height: 48px; border-radius: 14px; display: flex; justify-content: center; align-items: center; border: 1px solid rgba(168, 85, 247, 0.3);">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#A855F7"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            </div>
+            <div>
+                <h2 style="margin: 0; font-weight: 700; color: white;">Pago de Servicios</h2>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">Paga tus facturas usando tu número de tarjeta y PIN.</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
     if not account["Id_account"]:
         st.warning("No tienes una cuenta bancaria asociada.")
     else:
