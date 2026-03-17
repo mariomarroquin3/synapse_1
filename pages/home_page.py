@@ -513,15 +513,21 @@ elif menu == "Tarjetas":
                 formatted_number = " ".join([display_number[i:i+4] for i in range(0, 16, 4)])
                 
                 with cols[idx % 2]:
-                    # Estética de tarjeta "Premium"
-                    type_label = "DÉBITO" if type_id == 1 else "VIRTUAL"
-                    bg_color = "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)" if type_id == 1 else "linear-gradient(135deg, #312e81 0%, #1e1b4b 100%)"
+                    # Estética de tarjeta "Premium" con diferenciación de color
+                    if type_id == 1: # DEBITO
+                        type_label = "DÉBITO"
+                        bg_color = "linear-gradient(135deg, #0f172a 0%, #334155 100%)"
+                        card_icon = '<svg width="32" height="32" viewBox="0 0 24 24" fill="white" style="opacity: 0.6;"><path d="M4 10h3v7H4zM10.5 10h3v7h-3zM2 19h20v3H2zM17 10h3v7h-3zM12 1L2 6v2h20V6z"/></svg>'
+                    else: # VIRTUAL u otros
+                        type_label = "VIRTUAL"
+                        bg_color = "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)"
+                        card_icon = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="opacity: 0.8;"><path d="M21 12V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h7m9-7l-3-3m0 0l-3 3m3-3v10" stroke-linecap="round" stroke-linejoin="round"/></svg>'
                     
                     st.markdown(f"""
-                        <div style="background: {bg_color}; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 20px; position: relative; margin-bottom: 20px; color: white; min-height: 180px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                        <div style="background: {bg_color}; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 18px; padding: 22px; position: relative; margin-bottom: 20px; color: white; min-height: 190px; box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.3);">
                             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
-                                <span style="font-size: 0.7rem; font-weight: 700; opacity: 0.8; letter-spacing: 1px;">TARJETA {type_label}</span>
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="white" style="opacity: 0.5;"><path d="M4 10h3v7H4zM10.5 10h3v7h-3zM2 19h20v3H2zM17 10h3v7h-3zM12 1L2 6v2h20V6z"/></svg>
+                                <span style="font-size: 0.75rem; font-weight: 800; opacity: 0.9; letter-spacing: 1.5px; text-transform: uppercase;">{type_label}</span>
+                                {card_icon}
                             </div>
                             <div style="font-size: 1.4rem; font-weight: 600; letter-spacing: 2px; margin-bottom: 20px;">
                                 {formatted_number}
