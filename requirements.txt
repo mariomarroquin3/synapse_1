@@ -4,3 +4,5 @@ python-dotenv
 bcrypt
 reportlab
 streamlit-option-menu
+pandas
+altair

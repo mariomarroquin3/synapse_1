@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit as st # Synapse Private Banking - UI Enhanced
 import time
 from datetime import datetime
 import sys
@@ -203,64 +203,95 @@ elif menu == "Transferencias":
         st.warning("No tienes una cuenta bancaria asociada para hacer transferencias.")
     else:
         balance = get_account_balance(account["Id_account"])
-        st.write(f"**Saldo disponible:** $ {balance:,.2f} {account['currency']}")
         
-        with st.form("transfer_form"):
-            dest_account_num = st.text_input("Número de Cuenta Destino", placeholder="Ej. SV_synapse1234567")
-            amount_to_transfer = st.number_input("Monto a transferir", min_value=0.01, step=10.0, format="%.2f")
-            description = st.text_input("Concepto / Descripción", placeholder="Pago de servicios, almuerzo, etc.")
+        # --- CUENTA ORIGEN CARD ---
+        st.markdown(f"""
+            <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; position: relative; overflow: hidden; margin-bottom: 24px;">
+                <!-- Decorative Arrow SVG -->
+                <svg style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); width: 120px; height: 120px; opacity: 0.05; fill: white;" viewBox="0 0 24 24">
+                    <path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <p style="color: #3B82F6; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin: 0 0 8px 0; letter-spacing: 1px;">Cuenta Origen</p>
+                <h3 style="color: white; font-size: 1.5rem; font-weight: 700; margin: 0 0 4px 0; letter-spacing: 1px;">{account['account_number']}</h3>
+                <p style="color: #9CA3AF; font-size: 0.9rem; margin: 0;">Disponible: <span style="color: white; font-weight: 600;">${balance:,.2f}</span></p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown('<div class="transfer-container">', unsafe_allow_html=True)
+        with st.form("transfer_form", border=False):
+            # Input wrapper with right arrow for Cuenta Destino
+            st.markdown("""
+                <div style="position: relative;">
+                    <p style="color: #9CA3AF; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">Cuenta Destino</p>
+                    <svg style="position: absolute; right: 12px; bottom: 10px; width: 20px; height: 20px; opacity: 0.2; fill: white;" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            """, unsafe_allow_html=True)
+            dest_account_num = st.text_input("dest_account_num", label_visibility="collapsed", placeholder="Ej. 4521-XXXX...")
             
-            st.markdown('<div class="btn-success">', unsafe_allow_html=True)
-            submit_transfer = st.form_submit_button("Realizar Transferencia", type="primary", width="stretch")
+            st.markdown('<p style="color: #9CA3AF; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin: 16px 0 8px 0;">Monto (USD)</p>', unsafe_allow_html=True)
+            amount_to_transfer = st.number_input("amount_to_transfer", label_visibility="collapsed", min_value=0.00, step=10.0, format="%.2f")
+            
+            # Input wrapper with left arrow for Concepto
+            st.markdown("""
+                <div style="position: relative;">
+                    <p style="color: #9CA3AF; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">Concepto (Opcional)</p>
+                    <svg style="position: absolute; right: 12px; bottom: 10px; width: 20px; height: 20px; opacity: 0.2; fill: white; transform: rotate(180deg);" viewBox="0 0 24 24"><path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            """, unsafe_allow_html=True)
+            description = st.text_input("description", label_visibility="collapsed", placeholder="Ej. Pago de cena")
+            
+            st.markdown('<div style="margin-top: 32px;">', unsafe_allow_html=True)
+            submit_transfer = st.form_submit_button("Continuar", type="primary", use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
             
-            if submit_transfer:
-                if not dest_account_num or amount_to_transfer <= 0 or not description:
-                    st.warning("Por favor, completa todos los campos correctamente.")
-                elif dest_account_num == account["account_number"]:
-                    st.error("No puedes transferir dinero a tu propia cuenta.")
-                elif amount_to_transfer > balance:
-                    st.error("Fondos insuficientes para realizar esta transferencia.")
+        if submit_transfer:
+            if not dest_account_num or amount_to_transfer <= 0 or not description:
+                st.warning("Por favor, completa todos los campos correctamente.")
+            elif dest_account_num == account["account_number"]:
+                st.error("No puedes transferir dinero a tu propia cuenta.")
+            elif amount_to_transfer > balance:
+                st.error("Fondos insuficientes para realizar esta transferencia.")
+            else:
+                dest_account = get_account_by_number(dest_account_num)
+                if not dest_account:
+                    st.error("La cuenta destino no existe o es inválida.")
                 else:
-                    dest_account = get_account_by_number(dest_account_num)
-                    if not dest_account:
-                        st.error("La cuenta destino no existe o es inválida.")
-                    else:
-                        with st.spinner("Procesando transferencia..."):
-                            time.sleep(1.0)
-                            
-                            # OBTENER ID DESTINO DE FORMA SEGURA
-                            dest_account_id = None
-                            if isinstance(dest_account, (list, tuple)):
-                                dest_account_id = dest_account[0]
-                            elif isinstance(dest_account, dict):
-                                dest_account_id = dest_account.get("Id_account")
+                    with st.spinner("Procesando transferencia..."):
+                        time.sleep(1.0)
+                        
+                        # OBTENER ID DESTINO DE FORMA SEGURA
+                        dest_account_id = None
+                        if isinstance(dest_account, (list, tuple)):
+                            dest_account_id = dest_account[0]
+                        elif isinstance(dest_account, dict):
+                            dest_account_id = dest_account.get("Id_account")
 
-                            if dest_account_id:
-                                result = create_transfer(
-                                    from_account_id=account["Id_account"],
-                                    to_account_id=dest_account_id,
-                                    amount=amount_to_transfer,
-                                    description=description,
-                                    created_by_user_id=user["Id_user"],
-                                    transaction_type_id=1 
-                                )
-                                
-                                if result.get("success"):
-                                    if result.get("requires_approval"):
-                                        st.info(f"⏳ Transferencia de ${amount_to_transfer:,.2f} retenida para aprobación administrativa.")
-                                        st.warning("La transferencia se completará una vez sea revisada por un administrador.")
-                                        time.sleep(3)
-                                        st.rerun()
-                                    else:
-                                        st.success(f"¡Transferencia de ${amount_to_transfer:,.2f} realizada exitosamente!")
-                                        st.balloons()
-                                        time.sleep(1)
-                                        st.rerun() # Refrescar para ver nuevo balance
+                        if dest_account_id:
+                            result = create_transfer(
+                                from_account_id=account["Id_account"],
+                                to_account_id=dest_account_id,
+                                amount=amount_to_transfer,
+                                description=description,
+                                created_by_user_id=user["Id_user"],
+                                transaction_type_id=1 
+                            )
+                            
+                            if result.get("success"):
+                                if result.get("requires_approval"):
+                                    st.info(f"⏳ Transferencia de ${amount_to_transfer:,.2f} retenida para aprobación administrativa.")
+                                    st.warning("La transferencia se completará una vez sea revisada por un administrador.")
+                                    time.sleep(3)
+                                    st.rerun()
                                 else:
-                                    st.error(f"Error al procesar la transferencia: {result.get('error')}")
+                                    st.success(f"¡Transferencia de ${amount_to_transfer:,.2f} realizada exitosamente!")
+                                    st.balloons()
+                                    time.sleep(1)
+                                    st.rerun() # Refrescar para ver nuevo balance
                             else:
-                                st.error("No se pudo identificar el ID de la cuenta destino.")
+                                st.error(f"Error al procesar la transferencia: {result.get('error')}")
+                        else:
+                            st.error("No se pudo identificar el ID de la cuenta destino.")
 
 elif menu == "Historial":
     st.markdown("""
@@ -482,58 +513,71 @@ elif menu == "Tarjetas":
                 formatted_number = " ".join([display_number[i:i+4] for i in range(0, 16, 4)])
                 
                 with cols[idx % 2]:
-                    with st.container(border=True):
-                        # Estética de tarjeta "Premium"
-                        type_label = "DÉBITO" if type_id == 1 else "VIRTUAL"
-                        st.caption(f"TARJETA {type_label}")
-                        st.markdown(f"#### {formatted_number}")
-                        
-                        subcol1, subcol2 = st.columns(2)
-                        with subcol1:
-                            st.write(f"**Titular:**\n{holder}")
-                        with subcol2:
-                            exp_str = exp_date.strftime("%m/%y") if exp_date else "--/--"
-                            st.write(f"**Vence:**\n{exp_str}")
-                        
-                        status_text = "ACTIVA" if is_active else "BLOQUEADA"
-                        status_color = "#10B981" if is_active else "#EF4444"
-                        st.markdown(f"Estado: <span style='color:{status_color}; font-weight:bold;'>{status_text}</span>", unsafe_allow_html=True)
-                        
-                        # --- FLUJO DE RENOVACIÓN DE TARJETAS ---
-                        is_renewing = check_pending_renewal(card_id)
-                        
-                        if is_renewing:
-                            st.info("⏳ Renovación en curso. Acérquese a una sucursal para retirar su nueva tarjeta.", icon="⏳")
-                        elif is_card_near_expiration(exp_date):
-                            st.warning("⚠️ Su tarjeta expirará pronto.")
-                            if st.button("🔄 Renovar Tarjeta ($5.00)", key=f"btn_renew_card_{card_id}"):
-                                with st.spinner("Procesando pago de renovación..."):
-                                    res = request_card_renewal(card_id, account["Id_account"], user["Id_user"])
-                                    if res.get("success"):
-                                        st.success("¡Pago exitoso! Acuda a una sucursal para finalizar.")
-                                        time.sleep(2)
-                                        st.rerun()
-                                    else:
-                                        st.error(f"Error en renovación: {res.get('error')}")
-                        else:
-                            st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
-                        # BOTÓN GENERAR Y DESCARGAR TARJETA
-                        if st.button("🖨️ Generar tarjeta", key=f"print_card_{card_id}"):
-                            card_data_pdf = {
-                                "card_number": full_number,
-                                "expiration_date": exp_date,
-                                "full_name": holder
-                                }
-                            pdf_buffer = generate_card_pdf2(card_data_pdf, account["Id_account"])
-                            # limpiar espacios del nombre para el archivo
-                            safe_name = holder.replace(" ", "_")
-                            st.download_button(
-                                 label="📥 Descargar tarjeta PDF",
-                                   data=pdf_buffer,
-                                   file_name=f"Tarjeta_de_{safe_name}.pdf",
-                                   mime="application/pdf",
-                                   key=f"download_card_{card_id}"
-                                   )
+                    # Estética de tarjeta "Premium"
+                    type_label = "DÉBITO" if type_id == 1 else "VIRTUAL"
+                    bg_color = "linear-gradient(135deg, #1e293b 0%, #0f172a 100%)" if type_id == 1 else "linear-gradient(135deg, #312e81 0%, #1e1b4b 100%)"
+                    
+                    st.markdown(f"""
+                        <div style="background: {bg_color}; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; padding: 20px; position: relative; margin-bottom: 20px; color: white; min-height: 180px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                                <span style="font-size: 0.7rem; font-weight: 700; opacity: 0.8; letter-spacing: 1px;">TARJETA {type_label}</span>
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="white" style="opacity: 0.5;"><path d="M4 10h3v7H4zM10.5 10h3v7h-3zM2 19h20v3H2zM17 10h3v7h-3zM12 1L2 6v2h20V6z"/></svg>
+                            </div>
+                            <div style="font-size: 1.4rem; font-weight: 600; letter-spacing: 2px; margin-bottom: 20px;">
+                                {formatted_number}
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                                <div>
+                                    <p style="font-size: 0.6rem; opacity: 0.6; margin: 0; text-transform: uppercase;">Titular</p>
+                                    <p style="font-size: 0.9rem; font-weight: 500; margin: 0;">{holder}</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <p style="font-size: 0.6rem; opacity: 0.6; margin: 0; text-transform: uppercase;">Vence</p>
+                                    <p style="font-size: 0.9rem; font-weight: 500; margin: 0;">{exp_date.strftime('%m/%y') if exp_date else '--/--'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    status_text = "ACTIVA" if is_active else "BLOQUEADA"
+                    status_color = "#10B981" if is_active else "#EF4444"
+                    st.markdown(f"**Estado:** <span style='color:{status_color}; font-weight:bold;'>{status_text}</span>", unsafe_allow_html=True)
+                    
+                    # --- FLUJO DE RENOVACIÓN DE TARJETAS ---
+                    is_renewing = check_pending_renewal(card_id)
+                    
+                    if is_renewing:
+                        st.info("⏳ Renovación en curso. Acérquese a una sucursal para retirar su nueva tarjeta.", icon="⏳")
+                    elif is_card_near_expiration(exp_date):
+                        st.warning("⚠️ Su tarjeta expirará pronto.")
+                        if st.button("🔄 Renovar Tarjeta ($5.00)", key=f"btn_renew_card_{card_id}"):
+                            with st.spinner("Procesando pago de renovación..."):
+                                res = request_card_renewal(card_id, account["Id_account"], user["Id_user"])
+                                if res.get("success"):
+                                    st.success("¡Pago exitoso! Acuda a una sucursal para finalizar.")
+                                    time.sleep(2)
+                                    st.rerun()
+                                else:
+                                    st.error(f"Error en renovación: {res.get('error')}")
+                    else:
+                        st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
+                    # BOTÓN GENERAR Y DESCARGAR TARJETA
+                    if st.button("🖨️ Generar tarjeta", key=f"print_card_{card_id}"):
+                        card_data_pdf = {
+                            "card_number": full_number,
+                            "expiration_date": exp_date,
+                            "full_name": holder
+                            }
+                        pdf_buffer = generate_card_pdf2(card_data_pdf, account["Id_account"])
+                        # limpiar espacios del nombre para el archivo
+                        safe_name = holder.replace(" ", "_")
+                        st.download_button(
+                            label="📥 Descargar tarjeta PDF",
+                            data=pdf_buffer,
+                            file_name=f"Tarjeta_de_{safe_name}.pdf",
+                            mime="application/pdf",
+                            key=f"download_card_{card_id}"
+                            )
         else:
             st.info("No tienes tarjetas vinculadas a esta cuenta.")
 
@@ -632,14 +676,45 @@ elif menu == "Tarjetas":
                                     st.error(f"Error: {result.get('error')}")
 
 elif menu == "Ajustes":
-    st.subheader("Información Personal")
-    st.write(f"**Nombre:** {user['full_name']}")
-    st.write(f"**Email:** {user['email']}")
-    st.write(f"**Teléfono:** {user['phone_number']}")
-    st.write(f"**DUI:** {user['DUI']}")
+    st.markdown("""
+        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px;">
+            <div style="background: rgba(255, 255, 255, 0.05); width: 48px; height: 48px; border-radius: 14px; display: flex; justify-content: center; align-items: center; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="white"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </div>
+            <div>
+                <h2 style="margin: 0; font-weight: 700; color: white;">Ajustes de Cuenta</h2>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">Configura tu perfil y preferencias de seguridad.</p>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("### 👤 Información Personal")
+    
+    st.markdown(f"""
+        <div style="background: rgba(22, 22, 26, 0.6); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0; text-transform: uppercase;">Nombre Completo</p>
+                    <p style="color: white; font-weight: 600; font-size: 1.1rem; margin: 5px 0 0 0;">{user['full_name']}</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0; text-transform: uppercase;">Correo Electrónico</p>
+                    <p style="color: white; font-weight: 600; font-size: 1.1rem; margin: 5px 0 0 0;">{user['email']}</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0; text-transform: uppercase;">Teléfono</p>
+                    <p style="color: white; font-weight: 600; font-size: 1.1rem; margin: 5px 0 0 0;">{user['phone_number']}</p>
+                </div>
+                <div>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin: 0; text-transform: uppercase;">DUI</p>
+                    <p style="color: white; font-weight: 600; font-size: 1.1rem; margin: 5px 0 0 0;">{user['DUI']}</p>
+                </div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
     st.divider()
-    st.markdown("### � Cambiar Contraseña")
+    st.markdown("###  Cambiar Contraseña")
     
     with st.expander("Cambiar tu contraseña de acceso", expanded=False):
         # Input fields OUTSIDE form for real-time validation
@@ -705,7 +780,7 @@ elif menu == "Ajustes":
                     st.error(f"❌ {message}")
 
     st.divider()
-    st.markdown("### �📄 Generar Estado de Cuenta PDF")
+    st.markdown("### 📄 Generar Estado de Cuenta PDF")
 
     if account["Id_account"]:
         all_history = get_all_account_history(account["Id_account"])

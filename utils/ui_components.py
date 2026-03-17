@@ -35,12 +35,30 @@ def apply_premium_style():
         }
         footer {display: none !important;}
 
-        /* App Background gradients */
+        /* App Background with Ornaments */
         .stApp {
-            background: radial-gradient(circle at 15% 50%, rgba(37, 99, 235, 0.05), transparent 25%),
-                        radial-gradient(circle at 85% 30%, rgba(255, 255, 255, 0.02), transparent 25%),
-                        #0F0F13 !important;
+            background-color: #0F0F13 !important;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(37, 99, 235, 0.08), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(255, 255, 255, 0.02), transparent 25%);
+            background-attachment: fixed;
         }
+
+        /* Ambient Ornaments (Pills) */
+        .stApp::before, .stApp::after {
+            content: "";
+            position: fixed;
+            width: 300px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 100px;
+            filter: blur(40px);
+            z-index: -1;
+            transform: rotate(-35deg);
+        }
+        .stApp::before { top: 10%; right: -100px; }
+        .stApp::after { bottom: 15%; left: -100px; width: 400px; height: 150px; }
 
         /* Sidebar Moderno */
         section[data-testid="stSidebar"] {
@@ -114,18 +132,68 @@ def apply_premium_style():
         }
 
         /* Input Fields */
-        .stTextInput input, .stNumberInput input, .stSelectbox [data-baseweb="select"] {
-            background-color: rgba(0, 0, 0, 0.3) !important;
-            border-radius: 10px !important;
+        .stTextInput input, .stNumberInput input, .stSelectbox [data-baseweb="select"], .stDateInput input, .stTextArea textarea {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border-radius: 12px !important;
             border: 1px solid var(--border-color) !important;
             color: var(--text-primary) !important;
             padding: 10px 16px !important;
+            transition: all 0.2s ease;
         }
 
-        .stTextInput input:focus {
+        .stTextInput input:focus, .stNumberInput input:focus, .stDateInput input:focus {
             border-color: var(--primary) !important;
-            outline: none !important;
-            box-shadow: 0 0 0 1px var(--primary) !important;
+            background-color: rgba(37, 99, 235, 0.05) !important;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
+        }
+
+        /* Tabs Styling */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px !important;
+            background-color: transparent !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 8px 8px 0 0 !important;
+            padding: 10px 20px !important;
+            background-color: transparent !important;
+            color: var(--text-secondary) !important;
+            border: none !important;
+            font-weight: 500 !important;
+        }
+
+        .stTabs [data-baseweb="tab"]:hover {
+            color: white !important;
+            background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        .stTabs [aria-selected="true"] {
+            color: var(--primary) !important;
+            background-color: rgba(37, 99, 235, 0.05) !important;
+            border-bottom: 2px solid var(--primary) !important;
+        }
+
+        /* Expander Styling */
+        div[data-testid="stExpander"] {
+            background: rgba(255, 255, 255, 0.02) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 12px !important;
+            overflow: hidden !important;
+        }
+
+        /* Alerts */
+        [data-testid="stNotification"] {
+            border-radius: 12px !important;
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        }
+
+        /* Container con borde (st.container(border=True)) */
+        [data-testid="stVerticalBlockBorderWrapper"] > div:has(div[data-testid="stVerticalBlock"]) {
+            background: rgba(255, 255, 255, 0.02) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 16px !important;
+            padding: 20px !important;
         }
 
         /* Divider elegante */
@@ -139,20 +207,40 @@ def apply_premium_style():
             display: none !important;
         }
 
-        /* Scrollbar Personalizada */
-        ::-webkit-scrollbar {
-            width: 6px;
+        /* Transfer Form Specifics */
+        .stForm[data-testid="stForm"] {
+            border: none !important;
+            padding: 0 !important;
+            background: transparent !important;
         }
-        ::-webkit-scrollbar-track {
-            background: transparent;
+
+        /* Label styling to match design (all caps, small, grey) */
+        .stMarkdown p {
+            margin-bottom: 0px !important;
         }
-        ::-webkit-scrollbar-thumb {
-            background: #2D2D35;
-            border-radius: 10px;
+
+        /* Watermarked Input Emulation */
+        div[data-testid="stTextInput"], div[data-testid="stNumberInput"] {
+            position: relative;
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #4A4A57;
+        
+        /* Note: Adding a background image to the input area via CSS */
+        div[data-testid="stTextInput"] > div[data-baseweb="input"], 
+        div[data-testid="stNumberInput"] > div[data-baseweb="input"] {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 12px !important;
         }
+
+        /* Adjusting the main form container in Transfers if we didn't use st.form border=True */
+        .transfer-container {
+            background: rgba(22, 22, 26, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 32px;
+            backdrop-filter: blur(12px);
+        }
+
         </style>
     """, unsafe_allow_html=True)
 
