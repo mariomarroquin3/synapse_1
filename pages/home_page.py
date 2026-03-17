@@ -562,7 +562,10 @@ elif menu == "Tarjetas":
                     else:
                         st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
                     # BOTÓN GENERAR Y DESCARGAR TARJETA
-                    if st.button("🖨️ Generar tarjeta", key=f"print_card_{card_id}"):
+                    if st.button("📄 Ver / Imprimir Tarjeta (PDF)", key=f"print_card_{card_id}"):
+                        st.session_state[f"show_download_{card_id}"] = True
+
+                    if st.session_state.get(f"show_download_{card_id}"):
                         card_data_pdf = {
                             "card_number": full_number,
                             "expiration_date": exp_date,
@@ -578,6 +581,9 @@ elif menu == "Tarjetas":
                             mime="application/pdf",
                             key=f"download_card_{card_id}"
                             )
+                        if st.button("Cerrar", key=f"close_print_{card_id}"):
+                            st.session_state[f"show_download_{card_id}"] = False
+                            st.rerun()
         else:
             st.info("No tienes tarjetas vinculadas a esta cuenta.")
 
@@ -638,42 +644,43 @@ elif menu == "Tarjetas":
         
         # Mostrar el formulario SOLO si no se ha alcanzado el límite Y no hay una tarjeta recién creada mostrándose
         elif num_cards < 2:
-            with st.expander("Abrir formulario de solicitud"):
-                with st.form("new_card_form"):
-                    type_options = {1: "Débito Física", 2: "Virtual"}
-                    selected_type_name = st.selectbox("Tipo de Tarjeta", options=list(type_options.values()))
-                    selected_type_id = [k for k, v in type_options.items() if v == selected_type_name][0]
+            st.info("💡 Puedes solicitar hasta 2 tarjetas por cuenta.")
+            with st.form("new_card_form", border=True):
+                st.markdown("#### Formulario de Solicitud")
+                type_options = {1: "Débito Física", 2: "Virtual"}
+                selected_type_name = st.selectbox("Tipo de Tarjeta", options=list(type_options.values()))
+                selected_type_id = [k for k, v in type_options.items() if v == selected_type_name][0]
+                
+                holder_name = st.text_input("Nombre en la Tarjeta", value=user["full_name"])
+                
+                st.markdown('<div class="btn-success">', unsafe_allow_html=True)
+                submit_card = st.form_submit_button("Emitir Nueva Tarjeta", type="primary", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
                     
-                    holder_name = st.text_input("Nombre en la Tarjeta", value=user["full_name"])
-                    
-                    st.markdown('<div class="btn-success">', unsafe_allow_html=True)
-                    submit_card = st.form_submit_button("Emitir Tarjeta Ahora", type="primary")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    if submit_card:
-                        if not holder_name:
-                            st.error("El nombre del titular es requerido.")
+            if submit_card:
+                if not holder_name:
+                    st.error("El nombre del titular es requerido.")
+                else:
+                    with st.spinner("Generando nueva tarjeta..."):
+                        full_number = generate_luhn_card_number()
+                        result = create_card_for_account(
+                            account_id=account["Id_account"],
+                            card_type_id=selected_type_id,
+                            holder_name=holder_name,
+                            full_card_number=full_number
+                        )
+                        
+                        if result.get("success"):
+                            st.session_state.new_card_data = {
+                                "full_number": full_number,
+                                "pin": result["pin"],
+                                "last4": result["last4"],
+                                "holder_name": holder_name,
+                                "type_name": selected_type_name
+                            }
+                            st.rerun()
                         else:
-                            with st.spinner("Generando nueva tarjeta..."):
-                                full_number = generate_luhn_card_number()
-                                result = create_card_for_account(
-                                    account_id=account["Id_account"],
-                                    card_type_id=selected_type_id,
-                                    holder_name=holder_name,
-                                    full_card_number=full_number
-                                )
-                                
-                                if result.get("success"):
-                                    st.session_state.new_card_data = {
-                                        "full_number": full_number,
-                                        "pin": result["pin"],
-                                        "last4": result["last4"],
-                                        "holder_name": holder_name,
-                                        "type_name": selected_type_name
-                                    }
-                                    st.rerun()
-                                else:
-                                    st.error(f"Error: {result.get('error')}")
+                            st.error(f"Error: {result.get('error')}")
 
 elif menu == "Ajustes":
     st.markdown("""
