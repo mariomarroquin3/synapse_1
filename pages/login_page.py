@@ -32,7 +32,12 @@ apply_premium_style()
 st.markdown("""
 <style>
     .block-container { padding-top: 2rem !important; max-width: 500px !important; }
-    header, footer, [data-testid="stHeader"] {
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+        border: none !important;
+        z-index: 999 !important;
+    }
+    footer {
         visibility: hidden !important;
         display: none !important;
     }

@@ -31,7 +31,21 @@ def apply_premium_style():
         header[data-testid="stHeader"] {
             background-color: transparent !important;
             border: none !important;
-            display: none !important;
+            z-index: 999 !important;
+        }
+        
+        /* Asegurar que el botón de expandir sidebar sea visible y cliqueable */
+        button[data-testid="stSidebarCollapse"] {
+            background-color: rgba(37, 99, 235, 0.2) !important;
+            border-radius: 50% !important;
+            color: white !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        button[data-testid="stSidebarCollapse"]:hover {
+            background-color: var(--primary) !important;
+            transform: scale(1.1) !important;
         }
         footer {display: none !important;}
 
