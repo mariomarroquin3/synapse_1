@@ -49,12 +49,30 @@ def apply_premium_style():
         }
         footer {display: none !important;}
 
-        /* App Background gradients */
+/* App Background - Gradientes Radiales Definidos */
         .stApp {
-            background: radial-gradient(circle at 15% 50%, rgba(37, 99, 235, 0.05), transparent 25%),
-                        radial-gradient(circle at 85% 30%, rgba(255, 255, 255, 0.02), transparent 25%),
-                        #0F0F13 !important;
+            background: 
+                /* Círculo Azul en la esquina inferior izquierda */
+                radial-gradient(circle at 15% 85%, rgba(37, 99, 235, 0.2) 0%, transparent 40%),
+                /* Círculo Rojizo/Púrpura en la esquina superior derecha */
+                radial-gradient(circle at 85% 15%, rgba(220, 38, 38, 0.15) 0%, transparent 40%),
+                /* Fondo base casi negro */
+                #0F0F13 !important;
+            background-attachment: fixed;
         }
+
+        @keyframes gradient-animation {
+            0% {
+                background-position: 0% 50%; /* Inicio en la parte izquierda del gradiente */
+            }
+            50% {
+                background-position: 100% 50%; /* Mueve a la derecha del gradiente */
+            }
+            100% {
+                background-position: 0% 50%; /* Vuelve al inicio */
+            }
+        }
+}
 
         /* Sidebar Moderno */
         section[data-testid="stSidebar"] {
