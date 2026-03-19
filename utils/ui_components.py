@@ -72,7 +72,7 @@ def apply_premium_style():
                 background-position: 0% 50%; /* Vuelve al inicio */
             }
         }
-}
+} 
 
         /* Sidebar Moderno */
         section[data-testid="stSidebar"] {
