@@ -304,7 +304,6 @@ if role_id == 3:
         if staff_users:
             df_staff = pd.DataFrame(staff_users)
             df_staff = df_staff[['Id_user', 'full_name', 'email', 'role_id', 'is_active']]
-            # Map roles
             role_map = {1: "Cajero", 3: "Admin", 4: "Analista", 5: "Auditor"}
             df_staff['Rol'] = df_staff['role_id'].map(role_map)
             st.dataframe(df_staff, hide_index=True, use_container_width=True)
@@ -323,7 +322,6 @@ if role_id == 3:
                 user_list = [c for c in user_list if search_query_val in c['full_name'].lower() or search_query_val in c['email'].lower()]
             
             if is_staff_check:
-                # Optimized filtering: fetch all accounts once for these potential staff
                 u_ids = [u['Id_user'] for u in user_list]
                 all_staff_accs = get_accounts_by_user_ids(u_ids)
                 users_with_acc_ids = {a['user_id'] for a in all_staff_accs}
@@ -348,14 +346,33 @@ if role_id == 3:
                         c2.write(usr['email'])
                         c3.markdown(f"<span class='{status_class}'>{status_text}</span>", unsafe_allow_html=True)
                         btn_label = "Suspender" if usr['is_active'] else "Activar"
+
                         if c4.button(btn_label, key=f"user_st_{usr['Id_user']}"):
-                            update_user_status(usr['Id_user'], not usr['is_active'])
-                            st.cache_data.clear()
-                            st.success(f"Estado de {usr['full_name']} actualizado.")
+                            nuevo_estado = not usr['is_active']
+
+                            if update_user_status(usr['Id_user'], nuevo_estado):
+                                admin_id = st.session_state.get('user_data', {}).get('Id_user')
+
+                                if admin_id:
+                                    estado_anterior = "Activo" if usr['is_active'] else "Suspendido"
+                                    estado_nuevo = "Activo" if nuevo_estado else "Suspendido"
+
+                                    log_action(
+                                        user_id=int(admin_id),
+                                        action="CAMBIO_ESTADO_USUARIO",
+                                        details=f" ({usr['email']}) cambio a {estado_nuevo}"
+                                    )
+
+                                st.cache_data.clear()
+                                st.success(f"Estado de {usr['full_name']} actualizado.")
+                                st.rerun()
+
                     st.divider()
 
-            with tab_activos: render_sub_list([u for u in user_list if u['is_active']])
-            with tab_suspendidos: render_sub_list([u for u in user_list if not u['is_active']])
+            with tab_activos:
+                render_sub_list([u for u in user_list if u['is_active']])
+            with tab_suspendidos:
+                render_sub_list([u for u in user_list if not u['is_active']])
 
         with tab2_clientes:
             st.subheader("Gestión de Clientes Regulares")
@@ -605,7 +622,7 @@ if role_id == 3:
             cursor.execute(query)
             return cursor.fetchall()
 
-    # --- TAB 4: APROBACIONES ($10K+) ---
+# --- TAB 4: APROBACIONES ($10K+) ---
     with tab4:
         st.header("Transacciones Pendientes de Aprobación")
         st.write("Cualquier movimiento mayor o igual a $10,000 requiere autorización manual.")
@@ -631,21 +648,43 @@ if role_id == 3:
                     with c3:
                         note = st.text_input("Nota (opcional)", key=f"note_{tx_id}")
                         col_b1, col_b2 = st.columns(2)
+
                         st.markdown('<div class="btn-success">', unsafe_allow_html=True)
                         if col_b1.button("✅ Aprobar", key=f"app_{tx_id}", width="stretch", type="primary"):
                             res = review_transaction(tx_id, st.session_state['user_data']['Id_user'], True, note)
                             if res["success"]:
+                                admin_id = st.session_state.get('user_data', {}).get('Id_user')
+
+                                if admin_id:
+                                    log_action(
+                                        user_id=int(admin_id),
+                                        action="APROBACION_TRANSACCION",
+                                        details=f"Aprobó TX {tx_id} de {req} (${amt_display:,.2f})"
+                                    )
+
                                 st.cache_data.clear()
                                 st.success("Aprobada")
-                            else: st.error(res["error"])
+                            else:
+                                st.error(res["error"])
                         st.markdown('</div>', unsafe_allow_html=True)
+
                         st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
                         if col_b2.button("❌ Rechazar", key=f"rej_{tx_id}", width="stretch", type="secondary"):
                             res = review_transaction(tx_id, st.session_state['user_data']['Id_user'], False, note)
                             if res["success"]:
+                                admin_id = st.session_state.get('user_data', {}).get('Id_user')
+
+                                if admin_id:
+                                    log_action(
+                                        user_id=int(admin_id),
+                                        action="RECHAZO_TRANSACCION",
+                                        details=f"Rechazó TX {tx_id} de {req} (${amt_display:,.2f})"
+                                    )
+
                                 st.cache_data.clear()
                                 st.warning("Rechazada")
-                            else: st.error(res["error"])
+                            else:
+                                st.error(res["error"])
                         st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("No hay transacciones pendientes de revisión.")
