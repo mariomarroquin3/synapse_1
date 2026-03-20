@@ -1029,11 +1029,6 @@ elif role_id == 1:
                                 st.session_state['user_data']['Id_user']
                             ):
 
-                                log_action(
-                                    st.session_state['user_data']['Id_user'],
-                                    "ENTREGA_TARJETA",
-                                    f"Entrega de tarjeta terminada {r['card_number']}"
-                                )
 
                                 st.success("¡Tarjeta renovada y activada exitosamente!")
 
