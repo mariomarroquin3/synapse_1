@@ -75,7 +75,7 @@ def seed_accounts() -> None:
             if admin_id:
                 log_action(
                     user_id=admin_id,
-                    action="ACCOUNT_APPROVED",
+                    action="1",
                     details=f"Cuenta ID {account_id} aprobada para usuario '{full_name}' (ID {user_id}) — seed automático.",
                 )
 
