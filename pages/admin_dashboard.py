@@ -359,7 +359,7 @@ if role_id == 3:
 
                                     log_action(
                                         user_id=int(admin_id),
-                                        action="CAMBIO_ESTADO_USUARIO",
+                                        action="3",
                                         details=f" ({usr['email']}) cambio a {estado_nuevo}"
                                     )
 
@@ -524,7 +524,7 @@ if role_id == 3:
                                             # 🚀 Lanzamos el log
                                             log_action(
                                                 user_id=int(admin_id),
-                                                action="CAMBIO_ESTADO_CUENTA",
+                                                action="4",
                                                 details=f"Admin cambió estado de la cuenta {ac_num} a {nombre_estado}"
                                             )
                                         
@@ -558,7 +558,7 @@ if role_id == 3:
                                                 
                                                 if admin_id:
                                                     # Definimos la acción según el toggle
-                                                    accion_txt = "ACTIVAR_TARJETA" if nuevo_estado_card else "DESACTIVAR_TARJETA"
+                                                    accion_txt = "11" if nuevo_estado_card else "12"
                                                     
                                                     log_action(
                                                         user_id=int(admin_id),
@@ -658,7 +658,7 @@ if role_id == 3:
                                 if admin_id:
                                     log_action(
                                         user_id=int(admin_id),
-                                        action="APROBACION_TRANSACCION",
+                                        action="2",
                                         details=f"Aprobó TX {tx_id} de {req} (${amt_display:,.2f})"
                                     )
 
@@ -677,7 +677,7 @@ if role_id == 3:
                                 if admin_id:
                                     log_action(
                                         user_id=int(admin_id),
-                                        action="RECHAZO_TRANSACCION",
+                                        action="5",
                                         details=f"Rechazó TX {tx_id} de {req} (${amt_display:,.2f})"
                                     )
 
@@ -856,7 +856,7 @@ elif role_id == 1:
 
                 log_action(
                     st.session_state['user_data']['Id_user'],
-                    "APROBAR_CUENTA",
+                    "1",
                     f"Aprobación automática de cuenta {acc['account_number']} para: {nombre_cliente}"
                 )
             
@@ -895,7 +895,7 @@ elif role_id == 1:
                         approve_account(acc['Id_account'])
                         log_action(
                             st.session_state['user_data']['Id_user'],
-                            "APROBAR_CUENTA",
+                            "1",
                             f"Cajero aprobó la cuenta {acc['account_number']} de {nombre_cliente}"
                         )
                         # --- FIX CACHÉ ---
@@ -908,7 +908,7 @@ elif role_id == 1:
                         reject_account(acc['Id_account'])
                         log_action(
                             st.session_state['user_data']['Id_user'],
-                            "RECHAZAR_CUENTA",
+                            "6",
                             f"Cajero rechazó la cuenta {acc['account_number']} de {nombre_cliente}"
                         )
                         # --- FIX CACHÉ ---
@@ -969,7 +969,7 @@ elif role_id == 1:
 
                             log_action(
                                 st.session_state['user_data']['Id_user'],
-                                "TRANSACCION",
+                                "10",
                                 f"{tx_type} de ${tx_amount} en cuenta {search_acc}"
                             )
 
@@ -1091,7 +1091,7 @@ elif role_id == 1:
                         if res_tf.get('success'):
                             log_action(
                                 st.session_state['user_data']['Id_user'],
-                                "TRANSFERENCIA_CAJERO",
+                                "7",
                                 f"Cajero realizó transferencia de ${tf_monto:,.2f} de {tf_origen} a {tf_destino}: {tf_desc}"
                             )
                             if res_tf.get('requires_approval'):

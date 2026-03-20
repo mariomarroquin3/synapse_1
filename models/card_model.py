@@ -180,7 +180,7 @@ def request_card_renewal(card_id: int, account_id: int, user_id: int) -> Dict[st
             cursor.execute(q_insert, (card_id,))
             
         from services.audit_service import log_action
-        log_action(user_id, "SOLICITUD_RENOVACION_TARJETA", f"Cliente solicitó renovación de la tarjeta ID {card_id}")
+        log_action(user_id, "8", f"Cliente solicitó renovación de la tarjeta ID {card_id}")
             
         return {"success": True, "message": "Solicitud completada y cobro efectuado."}
     except Exception as e:
@@ -237,7 +237,7 @@ def finalize_card_renewal(renewal_id: int, card_id: int, admin_id: int) -> bool:
             cursor.execute(q_update_ticket, (renewal_id,))
             
         from services.audit_service import log_action
-        log_action(admin_id, "FINALIZO_RENOVACION_TARJETA", f"Cajero entregó y reactivó tarjeta {full_card_number}. Nueva expiración: {new_exp.strftime('%m/%y')}")
+        log_action(admin_id, "9", f"Cajero entregó y reactivó tarjeta {full_card_number}. Nueva expiración: {new_exp.strftime('%m/%y')}")
         
         return True
     except Exception as e:

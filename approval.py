@@ -64,7 +64,7 @@ def aprobacion_masiva_ajustes(admin_id: int):
             if res["success"]:
                 log_action(
                     user_id=admin_id,
-                    action="APROBACION_TRANSACCION",
+                    action="2",
                     details=f"Aprobó TX {tx_id} de {req} (${amount:,.2f}) - Ajuste Inicial"
                 )
                 print(" -> ✅ Aprobada con éxito.")
