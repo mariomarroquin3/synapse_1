@@ -245,9 +245,9 @@ with tab_reg:
         btn_reg = st.form_submit_button(
             "REGISTRARME AHORA", 
             type="primary",
-            use_container_width=True,
-            disabled=not password_is_valid and len(r_pass) > 0
+            use_container_width=True
         )
+
 
         if btn_reg:
             clean_name = get_clean_name(r_name_raw)
