@@ -12,25 +12,59 @@ def is_query_safe(query: str) -> bool:
         return False
     return True
 
-def execute_analyst_query() -> dict:
+def execute_analyst_query(start_date=None, end_date=None) -> dict:
     """
     Role ID = 4 (Analista Financiero)
     Retorna métricas agregadas (flujo de caja, resúmenes por tipo).
-    Validación de seguridad incluida.
+    Validación de seguridad incluida. Filtra por fechas si se proporcionan.
     """
-    query_flujo = '''
-        SELECT entry_type, SUM(amount) as monto_total
-        FROM ledger_entry
-        GROUP BY entry_type
-    '''
-    
-    query_tipos_base = '''
-        SELECT tt.name, t.Id_transaction,
-        (SELECT TOP 1 amount FROM ledger_entry WHERE transaction_id = t.Id_transaction) as amount
-        FROM [transaction] t
-        INNER JOIN transaction_type tt ON t.transaction_type_id = tt.Id_transaction_type
-    '''
-    
+    from datetime import datetime, time as dtime
+
+    # --- 1. PREPARACIÓN DE FECHAS ---
+    use_dates = False
+    if start_date and end_date:
+        use_dates = True
+        # Convertir date a datetime (inicio del día y fin del día)
+        if hasattr(start_date, 'year') and not hasattr(start_date, 'hour'):
+            dt_start = datetime.combine(start_date, dtime.min)
+            dt_end   = datetime.combine(end_date,   dtime.max)
+        else:
+            dt_start = start_date
+            dt_end   = end_date
+
+    # --- 2. CONSTRUCCIÓN DE CONSULTAS (Con o sin filtro) ---
+    if use_dates:
+        # Hacemos JOIN con [transaction] para poder filtrar ledger_entry por fecha
+        query_flujo = '''
+            SELECT le.entry_type, SUM(le.amount) as monto_total
+            FROM ledger_entry le
+            INNER JOIN [transaction] t ON le.transaction_id = t.Id_transaction
+            WHERE t.transaction_date BETWEEN ? AND ?
+            GROUP BY le.entry_type
+        '''
+        
+        query_tipos_base = '''
+            SELECT tt.name, t.Id_transaction,
+            (SELECT TOP 1 amount FROM ledger_entry WHERE transaction_id = t.Id_transaction) as amount
+            FROM [transaction] t
+            INNER JOIN transaction_type tt ON t.transaction_type_id = tt.Id_transaction_type
+            WHERE t.transaction_date BETWEEN ? AND ?
+        '''
+    else:
+        # Consultas originales (histórico completo)
+        query_flujo = '''
+            SELECT entry_type, SUM(amount) as monto_total
+            FROM ledger_entry
+            GROUP BY entry_type
+        '''
+        
+        query_tipos_base = '''
+            SELECT tt.name, t.Id_transaction,
+            (SELECT TOP 1 amount FROM ledger_entry WHERE transaction_id = t.Id_transaction) as amount
+            FROM [transaction] t
+            INNER JOIN transaction_type tt ON t.transaction_type_id = tt.Id_transaction_type
+        '''
+        
     if not is_query_safe(query_flujo) or not is_query_safe(query_tipos_base):
         return {"error": "403 Acceso Denegado: Modificación no autorizada.", "status": 403, "data": None}
         
@@ -40,13 +74,21 @@ def execute_analyst_query() -> dict:
         conn = get_connection()
         cursor = conn.cursor()
         
-        cursor.execute(query_flujo)
-        flujo_data = cursor.fetchall()
-        
-        cursor.execute(query_tipos_base)
-        tipos_raw = cursor.fetchall()
-        
-        # Agregación en Python para evadir limitaciones de MS Access con subconsultas
+        # --- 3. EJECUCIÓN CON O SIN PARÁMETROS ---
+        if use_dates:
+            cursor.execute(query_flujo, (dt_start, dt_end))
+            flujo_data = cursor.fetchall()
+            
+            cursor.execute(query_tipos_base, (dt_start, dt_end))
+            tipos_raw = cursor.fetchall()
+        else:
+            cursor.execute(query_flujo)
+            flujo_data = cursor.fetchall()
+            
+            cursor.execute(query_tipos_base)
+            tipos_raw = cursor.fetchall()
+            
+        # --- 4. AGREGACIÓN EN PYTHON ---
         tipos_dict = {}
         for row in tipos_raw:
             name = row[0]

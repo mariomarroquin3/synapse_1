@@ -1126,7 +1126,7 @@ elif role_id == 4:
         with col_f2:
             end_date = st.date_input("Fecha Fin", datetime.now())
 
-    res = execute_analyst_query()
+    res = execute_analyst_query(start_date, end_date)
 
     if res.get('status') == 200:
         data = res.get('data', {}) # Usamos .get() para evitar KeyError
@@ -1250,7 +1250,6 @@ from services.audit_service import log_action, get_filtered_auditor_admin_logs, 
 from config.database import get_cursor
 from card_print.audit_pdf import generar_pdf_auditoria
 
-# Asumo que role_id ya está definido antes en tu script principal
 if role_id == 5:
     st.header("Control de Riesgos - Auditor")
     st.write("Historial Detallado de Operaciones del Sistema. (Solo Lectura)")
