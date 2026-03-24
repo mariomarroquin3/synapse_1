@@ -1,11 +1,11 @@
 """
 seed_users.py
-─────────────────────────────────────────────────────────────
-Pobla la tabla [user] con usuarios de prueba usando Faker.
-• Genera nombres en español con género correcto (M/F).
-• Formatos de DUI y NIT: ########-#
-• Columnas en BD: dui, nit (minúsculas).
-• Crea también UN usuario admin (role_id=1) con contraseña 123456.
+-------------------------------------------------------------
+# Pobla la tabla [user] con usuarios de prueba usando Faker.
+# Genera nombres en espanol con genero correcto (M/F).
+# Formatos de DUI y NIT: ########-#
+# Columnas en BD: dui, nit (minusculas).
+# Crea tambien UN usuario admin (role_id=1) con contrasena 123456.
 
 Uso:
     python scripts/seed_users.py
@@ -17,7 +17,7 @@ import random
 import string
 from faker import Faker
 
-# ── Directorio raíz del proyecto en sys.path ──────────────────────────────
+# -- Directorio raiz del proyecto en sys.path ------------------------------
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
@@ -26,12 +26,12 @@ from utils.security import hash_password
 
 fake = Faker("es_MX")
 
-# ─────────────────────────────────────────────────────────────────────────
-# Helpers de generación de datos
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
+# Helpers de generacion de datos
+# -------------------------------------------------------------------------
 
 def _gen_dui() -> str:
-    """Genera un DUI con formato ########-# (9 dígitos separados por guión)."""
+    """Genera un DUI con formato ########-# (9 digitos separados por guion)."""
     nums = "".join(random.choices(string.digits, k=8))
     check = random.choice(string.digits)
     return f"{nums}-{check}"
@@ -40,13 +40,13 @@ def _gen_dui() -> str:
 def _gen_nit() -> str:
     """
     NIT usa el mismo formato que DUI: ########-#
-    (según la aclaración del usuario).
+    (segun la aclaracion del usuario).
     """
     return _gen_dui()
 
 
 def _gen_phone() -> str:
-    """Teléfono salvadoreño tipo 7XXX-XXXX o 6XXX-XXXX."""
+    """Telefono salvadoreno tipo 7XXX-XXXX o 6XXX-XXXX."""
     prefix = random.choice(["6", "7"])
     rest = "".join(random.choices(string.digits, k=3))
     last = "".join(random.choices(string.digits, k=4))
@@ -70,9 +70,9 @@ def _unique_phone(used: set) -> str:
             return v
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# Creación de usuarios clientes
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
+# Creacion de usuarios clientes
+# -------------------------------------------------------------------------
 
 def seed_clients(n: int) -> None:
     """Crea `n` usuarios cliente (role_id=2) con gender alternado M/F."""
@@ -89,13 +89,13 @@ def seed_clients(n: int) -> None:
     random.shuffle(genders)
 
     for gender in genders:
-        # 1. Generamos el nombre según el género usando métodos específicos
+        # 1. Generamos el nombre segun el genero usando metodos especificos
         if gender == "M":
             full_name = fake.name_male()
         else:
             full_name = fake.name_female()
 
-        # Email único, basado en nombre + números aleatorios
+        # Email unico, basado en nombre + numeros aleatorios
         base_email = (
             full_name.lower()
             .replace(" ", ".")
@@ -104,16 +104,16 @@ def seed_clients(n: int) -> None:
         )
         suffix = "".join(random.choices(string.digits, k=4))
         email = f"{base_email}{suffix}@gmail.com"
-        # Garantizar unicidad en sesión
+        # Garantizar unicidad en sesion
         while email in used_emails or get_user_by_email(email) is not None:
             suffix = "".join(random.choices(string.digits, k=4))
             email = f"{base_email}{suffix}@gmail.com"
         used_emails.add(email)
 
         dui   = _unique_dui(used_duis)
-        nit   = _gen_nit()      # NIT no requiere ser único por DUI
+        nit   = _gen_nit()      # NIT no requiere ser unico por DUI
         phone = _unique_phone(used_phones)
-        pwd   = hash_password("Password123!")   # contraseña base para todos los clientes
+        pwd   = hash_password("Password123!")   # contrasena base para todos los clientes
 
         try:
             uid = create_user(
@@ -127,25 +127,25 @@ def seed_clients(n: int) -> None:
                 phone_number=phone,
                 is_active=True,
             )
-            print(f"  ✅ [{gender}] {full_name} → ID {uid} | {email}")
+            print(f"  OK [{gender}] {full_name} > ID {uid} | {email}")
             created += 1
         except Exception as e:
-            print(f"  ❌ Error creando {full_name}: {e}")
+            print(f"  ERROR creando {full_name}: {e}")
             skipped += 1
 
     print(f"\n  Clientes creados: {created} | Omitidos: {skipped}")
 
 
-# ─────────────────────────────────────────────────────────────────────────
-# Creación de usuario Admin
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
+# Creacion de usuario Admin
+# -------------------------------------------------------------------------
 
 def seed_admin() -> None:
-    """Crea un usuario administrador con role_id=1 y contraseña 123456."""
+    """Crea un usuario administrador con role_id=1 y contrasena 123456."""
     admin_email = "admin@synapse.com"
 
     if get_user_by_email(admin_email) is not None:
-        print(f"  ⚠️  Admin '{admin_email}' ya existe. Se omite.")
+        print(f"  AVISO: Admin '{admin_email}' ya existe. Se omite.")
         return
 
     dui   = _gen_dui()
@@ -165,33 +165,33 @@ def seed_admin() -> None:
             phone_number=phone,
             is_active=True,
         )
-        print(f"  ✅ Admin creado → ID {uid} | {admin_email} | contraseña: 123456")
+        print(f"  OK Admin creado > ID {uid} | {admin_email} | contrasena: 123456")
     except Exception as e:
-        print(f"  ❌ Error creando admin: {e}")
+        print(f"  ERROR creando admin: {e}")
 
 
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 # Punto de entrada
-# ─────────────────────────────────────────────────────────────────────────
+# -------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("=" * 55)
-    print("  SEED — Tabla [user]")
-    print("=" * 55)
+    print("=======================================================")
+    print("  SEED - Tabla [user]")
+    print("=======================================================")
 
     try:
-        n_str = input("¿Cuántos usuarios cliente deseas crear? [default=20]: ").strip()
+        n_str = input("¿Cuantos usuarios cliente deseas crear? [default=20]: ").strip()
         n = int(n_str) if n_str else 20
         if n <= 0:
-            raise ValueError("El número debe ser positivo.")
+            raise ValueError("El numero debe ser positivo.")
     except ValueError as ve:
         print(f"Valor inválido ({ve}). Usando 20 por defecto.")
         n = 20
 
-    print(f"\n→ Creando {n} clientes...\n")
+    print(f"\n> Creando {n} clientes...\n")
     seed_clients(n)
 
-    print("\n→ Creando usuario admin...\n")
+    print("\n> Creando usuario admin...\n")
     seed_admin()
 
     print("\n" + "=" * 55)

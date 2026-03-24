@@ -932,9 +932,15 @@ elif menu == "Pago de Servicios":
                         )
                         
                         if resultado.get("success"):
-                            st.success(f"¡Pago de ${amount:,.2f} procesado exitosamente!")
-                            st.balloons()
-                            time.sleep(2)
-                            st.rerun()
+                            if resultado.get("requires_approval"):
+                                st.info(f"⏳ Pago de ${amount:,.2f} retenido para aprobación administrativa.")
+                                st.warning("El pago se completará una vez sea revisado por un administrador.")
+                                time.sleep(4)
+                                st.rerun()
+                            else:
+                                st.success(f"¡Pago de ${amount:,.2f} procesado exitosamente!")
+                                st.balloons()
+                                time.sleep(2)
+                                st.rerun()
                         else:
                             st.error(f"Error procesando pago: {resultado.get('error')}")                        

@@ -51,6 +51,21 @@ def register_user_with_permissions(creator_id, user_data):
     if target_role == ROLE_CLIENTE and creator_id:
         return {"success": False, "error": "Administrators are not allowed to create client accounts. Client registration is public only."}
 
+    from models.user_model import get_user_by_email, get_user_by_dui, get_user_by_nit, get_user_by_phone
+    
+    # Validaciones de unicidad (Evitar Duplicate Key Error)
+    if get_user_by_email(user_data['email']):
+        return {"success": False, "error": f"El correo electrónico '{user_data['email']}' ya está registrado."}
+    
+    if get_user_by_dui(user_data['dui']):
+        return {"success": False, "error": f"El DUI '{user_data['dui']}' ya está registrado."}
+    
+    if user_data.get('nit') and get_user_by_nit(user_data['nit']):
+        return {"success": False, "error": f"El NIT '{user_data['nit']}' ya está registrado."}
+    
+    if user_data.get('phone_number') and get_user_by_phone(user_data['phone_number']):
+        return {"success": False, "error": f"El teléfono '{user_data['phone_number']}' ya está registrado."}
+
     # If rules pass, proceed to creation
     try:
         pw_hash = hash_password(user_data['password'])

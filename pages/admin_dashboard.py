@@ -61,7 +61,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CÁLCULO DE MÉTRICAS (KPIs) ---
-@st.cache_data(ttl=600, max_entries=10)
 def get_admin_kpis():
     with get_cursor() as cursor:
         cursor.execute("SELECT COUNT(*) FROM [user] WHERE role_id = 2")
@@ -605,7 +604,6 @@ if role_id == 3:
                 estado_filtro=estado_filtro_stf
                 )
 
-    @st.cache_data(ttl=60)
     def get_pending_approvals():
         query = """
             SELECT 
@@ -646,48 +644,40 @@ if role_id == 3:
                         st.info(f"De: {from_acc if from_acc else 'N/A'}\nA: {to_acc if to_acc else 'N/A'}")
 
                     with c3:
-                        note = st.text_input("Nota (opcional)", key=f"note_{tx_id}")
+                        note = st.text_input("Nota (Obligatoria)", key=f"note_{tx_id}", placeholder="Escriba el motivo...")
                         col_b1, col_b2 = st.columns(2)
 
-                        st.markdown('<div class="btn-success">', unsafe_allow_html=True)
-                        if col_b1.button("✅ Aprobar", key=f"app_{tx_id}", width="stretch", type="primary"):
-                            res = review_transaction(tx_id, st.session_state['user_data']['Id_user'], True, note)
-                            if res["success"]:
-                                admin_id = st.session_state.get('user_data', {}).get('Id_user')
-
-                                if admin_id:
-                                    log_action(
-                                        user_id=int(admin_id),
-                                        action="2",
-                                        details=f"Aprobó TX {tx_id} de {req} (${amt_display:,.2f})"
-                                    )
-
-                                st.cache_data.clear()
-                                st.success("Aprobada")
+                        if col_b1.button("✅ Aprobar", key=f"app_{tx_id}", type="primary", use_container_width=True):
+                            if not note or note.strip() == "":
+                                st.warning("⚠️ Debe ingresar una nota.")
                             else:
-                                st.error(res["error"])
-                        st.markdown('</div>', unsafe_allow_html=True)
+                                res = review_transaction(tx_id, st.session_state['user_data']['Id_user'], True, note)
+                                if res.get("success"):
+                                    admin_id = st.session_state.get('user_data', {}).get('Id_user')
+                                    if admin_id:
+                                        log_action(user_id=int(admin_id), action="2", details=f"Aprobó TX {tx_id} de {req} (${amt_display:,.2f})")
+                                    st.success("Aprobada")
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error(res.get("error", "Error desconocido"))
 
-                        st.markdown('<div class="btn-danger">', unsafe_allow_html=True)
-                        if col_b2.button("❌ Rechazar", key=f"rej_{tx_id}", width="stretch", type="secondary"):
-                            res = review_transaction(tx_id, st.session_state['user_data']['Id_user'], False, note)
-                            if res["success"]:
-                                admin_id = st.session_state.get('user_data', {}).get('Id_user')
-
-                                if admin_id:
-                                    log_action(
-                                        user_id=int(admin_id),
-                                        action="5",
-                                        details=f"Rechazó TX {tx_id} de {req} (${amt_display:,.2f})"
-                                    )
-
-                                st.cache_data.clear()
-                                st.warning("Rechazada")
+                        if col_b2.button("❌ Rechazar", key=f"rej_{tx_id}", type="secondary", use_container_width=True):
+                            if not note or note.strip() == "":
+                                st.warning("⚠️ Debe ingresar una nota.")
                             else:
-                                st.error(res["error"])
-                        st.markdown('</div>', unsafe_allow_html=True)
+                                res = review_transaction(tx_id, st.session_state['user_data']['Id_user'], False, note)
+                                if res.get("success"):
+                                    admin_id = st.session_state.get('user_data', {}).get('Id_user')
+                                    if admin_id:
+                                        log_action(user_id=int(admin_id), action="5", details=f"Rechazó TX {tx_id} de {req} (${amt_display:,.2f})")
+                                    st.warning("Rechazada")
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.error(res.get("error", "Error desconocido"))
         else:
-            st.info("No hay transacciones pendientes de revisión.")
+            st.info("✅ No hay transacciones pendientes de revisión por el momento.")
 
     # --- TAB 5: HISTORIAL DE APROBACIONES ---
     with tab5:

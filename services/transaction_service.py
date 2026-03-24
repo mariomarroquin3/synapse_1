@@ -174,9 +174,9 @@ def create_transfer(from_account_id: int, to_account_id: int,
         # BIFURCACIÓN POR MONTO
         # ─────────────────────────────────────────────────────────────────────
         
-        if amount <= LIMIT_AUTO_APPROVE:
+        if amount < LIMIT_AUTO_APPROVE:
             # ✅ TRANSFERENCIA AUTOMÁTICA (monto <= límite)
-            print(f"[TX_SERVICE] Monto ${amount} <= Límite ${LIMIT_AUTO_APPROVE}. Aprobación automática.")
+            print(f"[TX_SERVICE] Monto ${amount} < Límite ${LIMIT_AUTO_APPROVE}. Aprobación automática.")
             
             status_id = 3  # Finalizada
             tx_id = _insert_transaction(cursor, transaction_type_id, status_id, description, created_by_user_id, created_at=created_at)
@@ -195,7 +195,7 @@ def create_transfer(from_account_id: int, to_account_id: int,
         
         else:
             # ⏳ TRANSFERENCIA PENDIENTE (monto > límite)
-            print(f"[TX_SERVICE] Monto ${amount} > Límite ${LIMIT_AUTO_APPROVE}. Requiere aprobación.")
+            print(f"[TX_SERVICE] Monto ${amount} >= Límite ${LIMIT_AUTO_APPROVE}. Requiere aprobación.")
             
             status_id = 2  # Pendiente
             tx_id = _insert_transaction(cursor, transaction_type_id, status_id, description, created_by_user_id, created_at=created_at)
@@ -297,8 +297,8 @@ def create_simple_transaction(account_id: int, amount: float,
         # ─────────────────────────────────────────────────────────────────────
         # CONTROL DE APROBACIÓN POR MONTO
         # ─────────────────────────────────────────────────────────────────────
-        if amount >= 10000.0:
-            print(f"[TX_SERVICE] Monto ${amount} >= $10,000. Requiere aprobación manual.")
+        if amount >= LIMIT_AUTO_APPROVE:
+            print(f"[TX_SERVICE] Monto ${amount} >= ${LIMIT_AUTO_APPROVE}. Requiere aprobación manual.")
             status_id = 2  # Pendiente
             tx_id = _insert_transaction(cursor, transaction_type_id, status_id, final_description, created_by_user_id, created_at=created_at)
             
@@ -324,10 +324,11 @@ def create_simple_transaction(account_id: int, amount: float,
             }
         
         else:
-            # Transacción normal
+            # Transacción normal (Monto < LIMIT_AUTO_APPROVE)
             tx_id = _insert_transaction(cursor, transaction_type_id, 3, final_description, created_by_user_id, created_at=created_at)
             create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=entry_type, created_at=created_at)
             conn.commit()
+            print(f"[TX_SERVICE] ✅ Transacción simple completada automáticamente.")
             return {"success": True, "transaction_id": tx_id, "requires_approval": False}
 
     except Exception as e:
@@ -387,19 +388,44 @@ def process_card_payment(card_number: str, pin: str, amount: float, description:
         if current_balance < amount:
             return {"success": False, "error": f"Fondos insuficientes. (Saldo disponible: ${current_balance:,.2f})"}
             
-        # 4. Registrar la transacción (ID=4 Pago, Status=1 Aprobado automático)
-        status_id = 3
-        transaction_type_id = 4
-        # Agregar el número de la tarjeta a la descripción para trazabilidad y enmascaramiento posterior
+        # 4. CONTROL DE APROBACIÓN POR MONTO (NUEVO)
+        # ─────────────────────────────────────────────────────────────────────
         full_description = f"{description} - Tarjeta: {card_number}"
         
-        tx_id = _insert_transaction(cursor, transaction_type_id, status_id, full_description, created_by_user_id)
+        if amount >= LIMIT_AUTO_APPROVE:
+            print(f"[TX_SERVICE] Pago con tarjeta ${amount} >= ${LIMIT_AUTO_APPROVE}. Requiere aprobación.")
+            status_id = 2  # Pendiente
+            transaction_type_id = 4 # Pago
+            
+            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, full_description, created_by_user_id)
+            
+            # Registrar en tabla de aprobaciones
+            sql_approval = """
+                INSERT INTO transaction_approvals
+                    (transaction_id, from_account_id, to_account_id, amount, created_at)
+                VALUES (?, ?, ?, ?, Now())
+            """
+            cursor.execute(sql_approval, (tx_id, account_id, None, amount))
+            
+            conn.commit()
+            return {
+                "success": True, 
+                "transaction_id": tx_id, 
+                "requires_approval": True,
+                "message": "Pago retenido para aprobación administrativa por monto alto."
+            }
         
-        # 5. Insertar débito en el Libro Mayor
-        create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=DEBIT)
-        
-        conn.commit()
-        return {"success": True, "transaction_id": tx_id, "message": "Pago realizado exitosamente."}
+        else:
+            # 5. Transacción normal (Monto < 10k)
+            status_id = 3
+            transaction_type_id = 4
+            tx_id = _insert_transaction(cursor, transaction_type_id, status_id, full_description, created_by_user_id)
+            
+            # Insertar débito en el Libro Mayor
+            create_ledger_entry(cursor=cursor, transaction_id=tx_id, account_id=account_id, amount=amount, entry_type=DEBIT)
+            
+            conn.commit()
+            return {"success": True, "transaction_id": tx_id, "message": "Pago realizado exitosamente."}
         
     except Exception as e:
         if conn: conn.rollback()
@@ -477,6 +503,10 @@ def review_transaction(transaction_id: int, admin_id: int, is_approved: bool, re
     Revisa y procesa cualquier transacción pendiente (Transferencia, Retiro, Depósito).
     """
     print(f"\n[TX_SERVICE] ─── Revisando Transacción (TX: {transaction_id}) ───────────")
+    
+    # VALIDACIÓN: Notas de revisión obligatorias
+    if not review_notes or str(review_notes).strip() == "":
+        return {"success": False, "error": "Las notas de revisión son obligatorias para procesar la transacción."}
     
     conn = None
     cursor = None

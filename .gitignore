@@ -81,3 +81,9 @@ extract_sql_deep.py
 txt.sql
 DOCUMENTACION_FLUJO_CLIENTE.md
 GUIA_REGISTRO_LOGIN.md
+*.py
+*.py
+scripts/clear_database.py
+scripts/clear_database.py
+scripts/clear_database.py
+scripts/clear_database.py
