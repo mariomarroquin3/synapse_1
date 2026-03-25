@@ -154,8 +154,7 @@ def request_card_renewal(card_id: int, account_id: int, user_id: int) -> Dict[st
     if check_pending_renewal(card_id):
         return {"success": False, "error": "Ya existe una renovación en proceso."}
     
-    # Aquí debemos cobrar los $5. Para evitar dependencias circulares complejas, 
-    # instanciamos un entry directo o llamamos al transaction engine asegurando importe
+    # Aquí debemos cobrar los $5
     from services.transaction_service import create_simple_transaction
     
     pay_res = create_simple_transaction(
@@ -174,18 +173,16 @@ def request_card_renewal(card_id: int, account_id: int, user_id: int) -> Dict[st
     # Cobro exitoso, proceder
     try:
         update_card_status(card_id, False) # Apagamos la tarjeta
-        # Insertamos el ticket
+        
+        # Insertamos el ticket en la tabla auxiliar para que el admin lo vea
         q_insert = "INSERT INTO [card_renewals] ([card_id], [requested_at], [processed]) VALUES (?, Now(), False)"
         with get_cursor(commit=True) as cursor:
             cursor.execute(q_insert, (card_id,))
             
-        from services.audit_service import log_action
-        log_action(user_id, "8", f"Cliente solicitó renovación de la tarjeta ID {card_id}")
-            
         return {"success": True, "message": "Solicitud completada y cobro efectuado."}
     except Exception as e:
         return {"success": False, "error": str(e)}
-
+    
 def get_pending_renewals():
     """Recupera los tickets de renovación listos para atención por cajero."""
     query = """
@@ -237,7 +234,7 @@ def finalize_card_renewal(renewal_id: int, card_id: int, admin_id: int) -> bool:
             cursor.execute(q_update_ticket, (renewal_id,))
             
         from services.audit_service import log_action
-        log_action(admin_id, "9", f"Cajero entregó y reactivó tarjeta {full_card_number}. Nueva expiración: {new_exp.strftime('%m/%y')}")
+        log_action(admin_id, "8", f"Cajero entregó y reactivó tarjeta {full_card_number}. Nueva expiración: {new_exp.strftime('%m/%y')}")
         
         return True
     except Exception as e:

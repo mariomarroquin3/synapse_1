@@ -557,7 +557,7 @@ if role_id == 3:
                                                 
                                                 if admin_id:
                                                     # Definimos la acción según el toggle
-                                                    accion_txt = "11" if nuevo_estado_card else "12"
+                                                    accion_txt = "10" if nuevo_estado_card else "11"
                                                     
                                                     log_action(
                                                         user_id=int(admin_id),
@@ -959,7 +959,7 @@ elif role_id == 1:
 
                             log_action(
                                 st.session_state['user_data']['Id_user'],
-                                "10",
+                                "9",
                                 f"{tx_type} de ${tx_amount} en cuenta {search_acc}"
                             )
 
