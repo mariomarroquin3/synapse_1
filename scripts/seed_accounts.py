@@ -62,7 +62,7 @@ def seed_accounts() -> None:
 
         try:
             # 1. Crear cuenta (status_id=4 PENDIENTE)
-            account_id = create_account(user_id, "USD")
+            account_id = create_account(user_id, 1)
             created += 1
             print(f"  OK: Cuenta creada > ID {account_id} para {full_name}")
 

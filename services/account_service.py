@@ -52,7 +52,7 @@ STATUS_NAMES = {
 # ACCOUNT CREATION
 # ═══════════════════════════════════════════════════════════════════════════
 
-def create_account_for_user(user_id: int, currency: str) -> Dict[str, Any]:
+def create_account_for_user(user_id: int, currency: int) -> Dict[str, Any]:
 
     try:
 

@@ -254,7 +254,7 @@ def add_ledger_entry_secure(account_id: int, amount: float,
 # ACCOUNT CREATION
 # ═══════════════════════════════════════════════════════════════════════════
 
-def create_account(user_id: int, currency: str) -> int:
+def create_account(user_id: int, currency: int) -> int:
 
     query = """
     INSERT INTO [account]
@@ -286,7 +286,7 @@ def create_account(user_id: int, currency: str) -> int:
         return int(result[0])
 
 
-def create_new_account(user_id: int, currency: str = "USD") -> int:
+def create_new_account(user_id: int, currency: int = 1) -> int:
 
     existing_accounts = get_accounts_by_user(user_id)
 

@@ -45,7 +45,7 @@ if "active_account_id" not in st.session_state:
 if user_accounts and st.session_state["active_account_id"] not in [acc["Id_account"] for acc in user_accounts]:
      st.session_state["active_account_id"] = user_accounts[0]["Id_account"]
 
-account = {"Id_account": None, "account_number": "Sin cuenta", "currency": "USD"}
+account = {"Id_account": None, "account_number": "Sin cuenta", "currency": 1}
 
 if user_accounts:
     active_row = next((acc for acc in user_accounts if acc["Id_account"] == st.session_state["active_account_id"]), user_accounts[0])
@@ -53,12 +53,12 @@ if user_accounts:
         if isinstance(active_row, (list, tuple)):
             account["Id_account"]     = active_row[0]
             account["account_number"] = active_row[2]
-            account["currency"]       = active_row[3] if len(active_row) > 3 else "USD"
+            account["currency"]       = active_row[3] if len(active_row) > 3 else 1
             account["status_id"]      = active_row[4] if len(active_row) > 4 else 1
         elif isinstance(active_row, dict):
             account["Id_account"]     = active_row.get("Id_account")
             account["account_number"] = active_row.get("account_number", "Sin cuenta")
-            account["currency"]       = active_row.get("currency", "USD")
+            account["currency"]       = active_row.get("currency", 1)
             account["status_id"]      = active_row.get("status_id", 1)
     except Exception as e:
         st.error(f"Error procesando datos de cuenta: {e}")
@@ -125,8 +125,9 @@ st.sidebar.markdown("### Mis Cuentas")
 
 if user_accounts:
     status_icons = {1: "✅", 2: "🔒", 3: "⏸️", 4: "⏳", 5: "❌"}
+    currency_map = {1: "USD"}  # Map currency ID to symbol
     account_options = {
-        acc["Id_account"]: f"{status_icons.get(acc.get('status_id'), '💳')} {acc.get('account_number')} ({acc.get('currency', 'USD')})" 
+        acc["Id_account"]: f"{status_icons.get(acc.get('status_id'), '💳')} {acc.get('account_number')} ({currency_map.get(acc.get('currency', 1), 'USD')})" 
         for acc in user_accounts
     }
     selected_acc = st.sidebar.selectbox(

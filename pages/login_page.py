@@ -281,7 +281,7 @@ with tab_reg:
                     else:
                         h = hash_password(r_pass)
                         u_id = create_user(2, r_email, h, nit_f, dui_f, clean_name, r_gen[0], tel_f)
-                        create_account_for_user(u_id, "USD")
+                        create_account_for_user(u_id, 1)
                         st.success("¡Bienvenido a Synapse!")
                         st.balloons()
                         time.sleep(2)
