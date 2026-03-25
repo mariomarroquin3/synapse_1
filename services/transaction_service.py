@@ -356,7 +356,7 @@ def process_card_payment(card_number: str, pin: str, amount: float, description:
         
         # 1. Validar Credenciales: Exact match y propidad con cuenta
         sql_validate = """
-            SELECT c.Id_card, a.Id_account, c.is_active, a.status_id, a.user_id
+            SELECT c.Id_card, a.Id_account, c.is_active, a.status_id, a.user_id, c.expiration_date
             FROM [card] c
             INNER JOIN [account] a ON c.account_id = a.Id_account
             WHERE c.card_number = ? AND c.card_number_last4 = ?
@@ -367,13 +367,16 @@ def process_card_payment(card_number: str, pin: str, amount: float, description:
         if not card_row:
             return {"success": False, "error": "Credenciales inválidas."}
             
-        card_id, account_id, is_active, status_id, user_id = card_row
+        card_id, account_id, is_active, status_id, user_id, expiration_date = card_row
         
         # Validar Candado 1: Propiedad de la Tarjeta
         if user_id != created_by_user_id:
             return {"success": False, "error": "Error: La tarjeta no pertenece a su perfil."}
         
-        # Validar Candado 2: Estados conjuntos
+        # Validar Candado 2: Estados conjuntos y Expiración
+        if expiration_date and expiration_date < datetime.now():
+             return {"success": False, "error": "Error: La tarjeta está vencida."}
+
         if not is_active or status_id != 1:
             return {"success": False, "error": "Error: Cuenta o tarjeta inactiva."}
             
