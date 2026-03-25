@@ -255,7 +255,7 @@ if role_id == 3:
         st.header("Gestión de Personal Interno")
 
         # Crear nuevo personal
-        with st.expander("➕ Registrar nuevo miembro del personal"):
+        with st.expander("➕ Registrar nuevo miembro del personal."):
             with st.form("create_staff_form"):
                 col1, col2 = st.columns(2)
                 with col1:
@@ -290,8 +290,23 @@ if role_id == 3:
                             "gender": s_gen[0],
                             "phone_number": f"+503 {s_phone[:4]}-{s_phone[4:]}" if len(s_phone) == 8 else s_phone
                         }
-                        res = register_user_with_permissions(st.session_state["user_data"]["Id_user"], user_data)
+
+                        res = register_user_with_permissions(
+                            st.session_state["user_data"]["Id_user"], 
+                            user_data
+                        )
+
                         if res["success"]:
+                           
+                            new_user_id = res.get("user_id", "N/A")
+
+                          
+                            log_action(
+                                st.session_state["user_data"]["Id_user"],  
+                                12,  
+                                f"Se incorporó un {s_role[1]}: {s_name} (ID: {new_user_id})"
+                            )
+
                             st.success(f"✅ Usuario {s_role[1]} **{s_name}** creado exitosamente.")
                             st.balloons()
                             st.rerun()
@@ -308,6 +323,8 @@ if role_id == 3:
             st.dataframe(df_staff, hide_index=True, use_container_width=True)
         else:
             st.info("No hay personal registrado.")
+
+
 
     # --- TAB 2: GESTIÓN DE CLIENTES ---
     with tab2:
