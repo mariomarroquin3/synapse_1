@@ -18,6 +18,7 @@ from services.transaction_service import review_transaction
 from config.database import get_cursor
 from utils.ui_components import apply_premium_style
 from models.account_model import get_pending_accounts, approve_account, reject_account
+from card_print.audit_pdf import generar_pdf_auditoria
 
 
 # ─────────────────────────────────────────────
@@ -696,16 +697,39 @@ if role_id == 3:
         else:
             st.info("✅ No hay transacciones pendientes de revisión por el momento.")
 
-    # --- TAB 5: HISTORIAL DE APROBACIONES ---
+ # --- TAB 5: HISTORIAL DE APROBACIONES ---
     with tab5:
         st.header("Historial de Revisiones")
         st.write("Registro de transacciones que ya han sido procesadas por el equipo administrativo.")
 
+        import datetime
+
+        # 🔹 FILTRO POR FECHA (OPCIONAL)
+        with st.container(border=True):
+            st.markdown("#### 🔍 Filtro por Fecha")
+
+            default_end = datetime.date.today()
+            default_start = default_end - datetime.timedelta(days=30)
+
+            date_range = st.date_input(
+                "📅 Rango de Fechas",
+                value=(default_start, default_end),
+                key="date_tab5_simple"
+            )
+
+        start_date, end_date = None, None
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = date_range
+
+        st.divider()
+
+        # 🔹 CONTROL DE MOSTRAR TODO / 50
         if "show_all_approvals" not in st.session_state:
             st.session_state.show_all_approvals = False
 
         limit_app = None if st.session_state.show_all_approvals else 50
 
+        # 🔹 CONSULTA (NO SE TOCA)
         try:
             if limit_app is None:
                 with st.spinner("Cargando historial completo de aprobaciones..."):
@@ -716,110 +740,182 @@ if role_id == 3:
             st.error(f"Error cargando aprobaciones: {e}")
             movimientos = []
 
+        # 🔹 FILTRO EN MEMORIA (NO TOCA BD)
+        if movimientos and start_date and end_date:
+            movimientos = [
+                m for m in movimientos
+                if m[2] and start_date <= m[2].date() <= end_date
+            ]
+
+        # 🔹 UI
         if movimientos:
             for m in movimientos:
                 tx_id, desc, date, amount, rev_date, notes, t_name, req, admin, s_name, s_id = m
+
                 with st.container(border=True):
                     c1, c2, c3 = st.columns([2, 1.5, 1])
+
                     with c1:
                         st.markdown(f"**ID:** {tx_id} | **Tipo:** {t_name}")
                         st.markdown(f"**Cliente:** {req}")
                         st.markdown(f"**Monto:** `${float(amount or 0):,.2f}`")
-                        st.caption(f"Fecha Solicitud: {date.strftime('%d/%m/%Y %H:%M') if date else 'N/A'}")
+                        st.caption(
+                            f"Fecha Solicitud: {date.strftime('%d/%m/%Y %H:%M') if date else 'N/A'}"
+                        )
 
                     with c2:
                         status_color = "#10B981" if s_id == 3 else "#EF4444"
-                        st.markdown(f"**Estado:** <span style='color:{status_color}; font-weight:bold;'>{s_name.upper()}</span>", unsafe_allow_html=True)
+                        st.markdown(
+                            f"**Estado:** <span style='color:{status_color}; font-weight:bold;'>{s_name.upper()}</span>",
+                            unsafe_allow_html=True
+                        )
                         st.markdown(f"**Revisado por:** {admin if admin else 'Sistema'}")
-                        st.caption(f"Fecha Revisión: {rev_date.strftime('%d/%m/%Y %H:%M') if rev_date else 'N/A'}")
+                        st.caption(
+                            f"Fecha Revisión: {rev_date.strftime('%d/%m/%Y %H:%M') if rev_date else 'N/A'}"
+                        )
 
                     with c3:
                         st.markdown("**Notas de Revisión:**")
                         st.info(notes if notes else "Sin observaciones.")
-            
+
             st.divider()
+
+            # 🔹 BOTONES
             if limit_app == 50 and len(movimientos) == 50:
                 if st.button("📂 Mostrar todo el historial de Aprobaciones", key="btn_show_all_approvals"):
                     st.session_state.show_all_approvals = True
                     st.rerun()
+
             elif limit_app is None:
                 if st.button("🔽 Volver a los 50 más recientes", key="btn_show_last_approvals"):
                     st.session_state.show_all_approvals = False
                     st.rerun()
+
         else:
-            st.info("No hay historial de revisiones disponible.")
+            st.info("No hay historial de revisiones disponible con los filtros seleccionados.")
 
 
-    # --- TAB 6: CONFIGURACIÓN ---
-        with tab6:
-            st.header("⚙️ Configuración")
-            st.subheader("📜 Historial de Tus Acciones Administrativas")
+# --- TAB 6: CONFIGURACIÓN ---
+    with tab6:
+        st.header("⚙️ Configuración")
+        st.subheader("📜 Historial de Tus Acciones Administrativas")
 
-            import datetime
-            u_id = int(st.session_state['user_data']['Id_user'])
-            
-            with st.container(border=True):
-                st.markdown("#### 🔍 Filtros de Búsqueda")
-                col_f1, col_f2 = st.columns(2)
-                
-                try:
-                    acciones_unicas = get_user_actions(u_id)
-                except Exception:
-                    acciones_unicas = []
-                acciones = ["Todas"] + sorted(acciones_unicas)
-                
-                with col_f1:
-                    action_filter = st.selectbox("⚙️ Tipo de acción", acciones, key="filter_tab6_final")
-                
-                with col_f2:
-                    default_end = datetime.date.today()
-                    default_start = default_end - datetime.timedelta(days=30)
-                    date_range = st.date_input("📅 Rango de Fechas", value=(default_start, default_end), key="date_tab6")
-                    
-            start_date, end_date = None, None
-            if isinstance(date_range, tuple) and len(date_range) == 2:
-                start_date, end_date = date_range
-                
-            st.divider()
+        import datetime
+        from card_print.audit_pdf import generar_pdf_auditoria
 
-            if "show_all_logs" not in st.session_state:
-                st.session_state.show_all_logs = False
-
-            limit = None if st.session_state.show_all_logs else 50
+        u_id = int(st.session_state['user_data']['Id_user'])
+        
+        with st.container(border=True):
+            st.markdown("#### 🔍 Filtros de Búsqueda")
+            col_f1, col_f2 = st.columns(2)
             
             try:
-                if limit is None:
-                    with st.spinner("Cargando historial completo..."):
-                        logs_validados = get_filtered_audit_logs(u_id, limit, start_date, end_date, action_filter)
-                else:
-                    logs_validados = get_filtered_audit_logs(u_id, limit, start_date, end_date, action_filter)
+                acciones_unicas = get_user_actions(u_id)
+            except Exception:
+                acciones_unicas = []
 
-                if logs_validados:
-                    df_logs = pd.DataFrame(logs_validados, columns=["ID", "Acción", "Detalles", "Fecha"])
-                    df_logs["Fecha"] = pd.to_datetime(df_logs["Fecha"])
+            acciones = ["Todas"] + sorted(acciones_unicas)
+            
+            with col_f1:
+                action_filter = st.selectbox(
+                    "⚙️ Tipo de acción",
+                    acciones,
+                    key="filter_tab6_final"
+                )
+            
+            with col_f2:
+                default_end = datetime.date.today()
+                default_start = default_end - datetime.timedelta(days=30)
 
-                    st.dataframe(
-                        df_logs.sort_values(by="Fecha", ascending=False),
-                        height=450,
-                        hide_index=True,
-                        use_container_width=True
-                    )
-                    st.caption(f"Mostrando {len(df_logs)} acciones registradas.")
-                    
-                    if limit == 50 and len(df_logs) == 50:
-                        if st.button("📂 Mostrar todos los registros de esta búsqueda"):
-                            st.session_state.show_all_logs = True
-                            st.rerun()
-                    elif limit is None:
-                        if st.button("🔽 Volver a los 50 más recientes"):
-                            st.session_state.show_all_logs = False
-                            st.rerun()
-                else:
-                    st.info("No se encontraron registros con los filtros seleccionados.")
-                    
-            except Exception as e:
-                st.error(f"Error de base de datos: {str(e)}")
+                date_range = st.date_input(
+                    "📅 Rango de Fechas",
+                    value=(default_start, default_end),
+                    key="date_tab6"
+                )
                 
+        start_date, end_date = None, None
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = date_range
+            
+        st.divider()
+
+        if "show_all_logs" not in st.session_state:
+            st.session_state.show_all_logs = False
+
+        if "pdf_logs_buffer" not in st.session_state:
+            st.session_state.pdf_logs_buffer = None
+
+        limit = None if st.session_state.show_all_logs else 50
+        
+        try:
+            if limit is None:
+                with st.spinner("Cargando historial completo..."):
+                    logs_validados = get_filtered_audit_logs(
+                        u_id, limit, start_date, end_date, action_filter
+                    )
+            else:
+                logs_validados = get_filtered_audit_logs(
+                    u_id, limit, start_date, end_date, action_filter
+                )
+
+            if logs_validados:
+                df_logs = pd.DataFrame(
+                    logs_validados,
+                    columns=["ID", "Acción", "Detalles", "Fecha"]
+                )
+
+                df_logs["Fecha"] = pd.to_datetime(df_logs["Fecha"])
+
+                # 🔹 ORDENAR
+                df_logs_sorted = df_logs.sort_values(by="Fecha", ascending=False)
+
+                # 🔹 TABLA
+                st.dataframe(
+                    df_logs_sorted,
+                    height=450,
+                    hide_index=True,
+                    use_container_width=True
+                )
+
+                st.caption(f"Mostrando {len(df_logs_sorted)} acciones registradas.")
+
+                # 🔹 GENERAR PDF
+                rango_enviar_logs = date_range if isinstance(date_range, tuple) else None
+
+                if st.button("📄 Generar PDF", key="btn_generar_pdf_logs"):
+                    with st.spinner("Generando PDF..."):
+                        st.session_state.pdf_logs_buffer = generar_pdf_auditoria(
+                            df_logs_sorted,
+                            "Reporte de Acciones Administrativas",
+                            rango_enviar_logs
+                        )
+
+                # 🔹 DESCARGAR PDF
+                if st.session_state.pdf_logs_buffer:
+                    st.download_button(
+                        label="⬇️ Descargar PDF",
+                        data=st.session_state.pdf_logs_buffer,
+                        file_name=f"Auditoria_Logs_{datetime.date.today()}.pdf",
+                        mime="application/pdf",
+                        key="btn_pdf_logs"
+                    )
+
+                # 🔹 BOTONES MOSTRAR MÁS
+                if limit == 50 and len(df_logs_sorted) == 50:
+                    if st.button("📂 Mostrar todos los registros de esta búsqueda"):
+                        st.session_state.show_all_logs = True
+                        st.rerun()
+
+                elif limit is None:
+                    if st.button("🔽 Volver a los 50 más recientes"):
+                        st.session_state.show_all_logs = False
+                        st.rerun()
+
+            else:
+                st.info("No se encontraron registros con los filtros seleccionados.")
+                
+        except Exception as e:
+            st.error(f"Error de base de datos: {str(e)}")
 #--------------------------------------------------
 # PANEL CAJERO 
 # -------------------------------------------------
