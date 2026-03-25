@@ -255,7 +255,7 @@ if role_id == 3:
         st.header("Gestión de Personal Interno")
 
         # Crear nuevo personal
-        with st.expander("➕ Registrar nuevo miembro del personal"):
+        with st.expander("➕ Registrar nuevo miembro del personal."):
             with st.form("create_staff_form"):
                 col1, col2 = st.columns(2)
                 with col1:
