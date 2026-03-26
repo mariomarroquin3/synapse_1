@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
 from models.user_model import get_users_by_role_category, update_user_status
-from models.account_model import get_accounts_by_user, update_account_status, get_accounts_by_user_ids
+from models.account_model import get_accounts_by_user, update_account_status, get_accounts_by_user_ids, get_all_accounts_global
 from models.card_model import get_cards_by_account, update_card_status, get_cards_by_account_ids
 from services.user_service import register_user_with_permissions
 from services.transaction_service import review_transaction
@@ -423,20 +423,23 @@ if role_id == 3:
                 st.info("No hay usuarios en esta categoría.")
                 return 
 
-            # 2. Obtener TODAS las cuentas de estos usuarios para las métricas
+            # 2a. Obtener cuentas GLOBALES para calcular KPIs (estáticos, sin filtro de user_id)
+            all_accounts_global = get_all_accounts_global()
+            
+            # 2b. Obtener cuentas filtradas por usuarios seleccionados (para listado dinámico del dashboard)
             u_ids = [u['Id_user'] for u in user_list]
             all_accounts = get_accounts_by_user_ids(u_ids)
             
-            if not all_accounts:
-                st.info("No hay cuentas registradas.")
+            if not all_accounts_global:
+                st.info("No hay cuentas registradas en la base de datos.")
                 return
 
-            # --- MÉTRICAS (Siempre visibles con los 5 estados) ---
-            t_act = sum(1 for acc in all_accounts if acc.get("status_id") == 1)
-            t_blo = sum(1 for acc in all_accounts if acc.get("status_id") == 2)
-            t_sus = sum(1 for acc in all_accounts if acc.get("status_id") == 3)
-            t_pen = sum(1 for acc in all_accounts if acc.get("status_id") == 4)
-            t_rec = sum(1 for acc in all_accounts if acc.get("status_id") == 5)
+            # --- MÉTRICAS (GLOBALES - basadas en todas las cuentas, no filtradas por usuario) ---
+            t_act = sum(1 for acc in all_accounts_global if acc.get("status_id") == 1)
+            t_blo = sum(1 for acc in all_accounts_global if acc.get("status_id") == 2)
+            t_sus = sum(1 for acc in all_accounts_global if acc.get("status_id") == 3)
+            t_pen = sum(1 for acc in all_accounts_global if acc.get("status_id") == 4)
+            t_rec = sum(1 for acc in all_accounts_global if acc.get("status_id") == 5)
             
             m1, m2, m3, m4, m5 = st.columns(5)
             m1.metric("✅ Activas", t_act)
