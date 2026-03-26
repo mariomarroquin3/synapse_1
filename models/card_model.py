@@ -160,7 +160,7 @@ def request_card_renewal(card_id: int, account_id: int, user_id: int) -> Dict[st
     pay_res = create_simple_transaction(
         account_id=account_id,
         amount=5.00,
-        entry_type="debit",
+        entry_type=2,
         description=f"Pago por comisión de renovación (Tarjeta #{card_id})",
         created_by_user_id=user_id,
         transaction_type_id=4, # Pago

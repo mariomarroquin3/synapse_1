@@ -230,7 +230,7 @@ def create_transfer(from_account_id: int, to_account_id: int,
 # ─────────────────────────────────────────────
 
 def create_simple_transaction(account_id: int, amount: float,
-                               entry_type: str, description: str,
+                               entry_type: str, description: str, # <-- Aquí
                                created_by_user_id: int,
                                transaction_type_id: int, 
                                status_id: int = 3,
@@ -542,14 +542,14 @@ def review_transaction(transaction_id: int, admin_id: int, is_approved: bool, re
             # Actualizar status a 3 (Finalizada)
             cursor.execute("UPDATE [transaction] SET status_id = 3 WHERE Id_transaction = ?", (transaction_id,))
             
-            # Insertar en Ledger según el tipo
+            # --- CORRECCIÓN: Uso de parámetros nombrados para evitar cruce de datos ---
             if type_id == 1: # Transferencia
-                create_ledger_entry(cursor, transaction_id, from_acc, amount, DEBIT)
-                create_ledger_entry(cursor, transaction_id, to_acc, amount, CREDIT)
+                create_ledger_entry(cursor=cursor, transaction_id=transaction_id, account_id=from_acc, amount=amount, entry_type=DEBIT)
+                create_ledger_entry(cursor=cursor, transaction_id=transaction_id, account_id=to_acc, amount=amount, entry_type=CREDIT)
             elif type_id == 2 or type_id == 4: # Retiro o Pago de tarjeta (Salida)
-                create_ledger_entry(cursor, transaction_id, from_acc, amount, DEBIT)
+                create_ledger_entry(cursor=cursor, transaction_id=transaction_id, account_id=from_acc, amount=amount, entry_type=DEBIT)
             elif type_id == 3: # Depósito (Entrada)
-                create_ledger_entry(cursor, transaction_id, to_acc, amount, CREDIT)
+                create_ledger_entry(cursor=cursor, transaction_id=transaction_id, account_id=to_acc, amount=amount, entry_type=CREDIT)
             
             conn.commit()
             return {"success": True, "message": "Transacción aprobada y procesada."}

@@ -1055,12 +1055,14 @@ elif role_id == 1:
 
                         # 2 Retiro / 3 Depósito
                         t_id = 2 if tx_type == "Retiro" else 3
-                        entry = "debit" if t_id == 2 else "credit"
+                        
+                        # ACTUALIZACIÓN: Asignamos 2 (DEBIT) para Retiro, o 1 (CREDIT) para Depósito
+                        entry = 2 if t_id == 2 else 1
 
                         res = create_simple_transaction(
                             account_id=acc_id,
                             amount=tx_amount,
-                            entry_type=entry,
+                            entry_type=entry, # Ahora le pasamos el int
                             description=tx_desc,
                             created_by_user_id=st.session_state['user_data']['Id_user'],
                             transaction_type_id=t_id
@@ -1085,6 +1087,7 @@ elif role_id == 1:
             st.error("Cuenta no encontrada.")
             
     st.divider()
+
 
     # -------------------------------------------------
     # ENTREGA DE TARJETAS RENOVADAS
@@ -1243,8 +1246,12 @@ elif role_id == 4:
 
         # --- 2. KPIs DE CABECERA ---
         if not df_flujo.empty:
-            total_credit = df_flujo[df_flujo['entry_type'] == 'credit']['total'].sum()
-            total_debit = df_flujo[df_flujo['entry_type'] == 'debit']['total'].sum()
+            CREDIT = 1
+            DEBIT = 2
+            
+            # Filtramos por los valores numéricos en lugar de los textos
+            total_credit = df_flujo[df_flujo['entry_type'] == CREDIT]['total'].sum()
+            total_debit = df_flujo[df_flujo['entry_type'] == DEBIT]['total'].sum()
             balance = total_credit - total_debit
 
             st.caption(f"Resumen del periodo: {start_date.strftime('%d/%m/%Y')} al {end_date.strftime('%d/%m/%Y')}")
@@ -1623,9 +1630,12 @@ if role_id == 5:
                 history = get_all_account_history(selected_acc_id)
                 
                 if history:
+                    # ACTUALIZACIÓN: Cambiamos "credit" por el número 1
+                    CREDIT = 1 
+
                     # Calcular el saldo acumulado (running total)
                     df_ev = pd.DataFrame([
-                        {"fecha": tx["date"], "monto": tx["amount"] if tx["entry_type"] == "credit" else -tx["amount"]}
+                        {"fecha": tx["date"], "monto": tx["amount"] if tx["entry_type"] == CREDIT else -tx["amount"]}
                         for tx in sorted(history, key=lambda x: x["date"])
                     ])
                     df_ev["saldo"] = df_ev["monto"].cumsum()

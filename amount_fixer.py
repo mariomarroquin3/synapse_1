@@ -3,8 +3,12 @@ from services.transaction_service import get_all_account_history, create_simple_
 
 # Suponiendo que tu conexión está en un archivo llamado db_connection.py o similar
 from config.database import get_connection
-# CREDIT = 'CREDIT'  # o como lo tengas definido
-# DEBIT = 'DEBIT'
+
+# ─────────────────────────────────────────────
+# CONSTANTES ACTUALIZADAS (Alineadas con entry_types)
+# ─────────────────────────────────────────────
+CREDIT = 1
+DEBIT = 2
 
 def arreglar_saldos_negativos_con_servicios():
     conn = None
@@ -13,7 +17,7 @@ def arreglar_saldos_negativos_con_servicios():
         conn = get_connection()
         cursor = conn.cursor()
         
-        # 1. Obtener todas las cuentas existentes (único paso que requiere SQL directo aquí)
+        # 1. Obtener todas las cuentas existentes
         cursor.execute("SELECT Id_account, user_id FROM [account]")
         cuentas = cursor.fetchall()
         
@@ -28,16 +32,15 @@ def arreglar_saldos_negativos_con_servicios():
 
     for cuenta in cuentas:
         account_id = cuenta[0]
-        user_id = cuenta[1] # Usaremos el dueño de la cuenta como creador, o puedes poner el ID de un Admin (ej: 1)
+        user_id = cuenta[1] # Usaremos el dueño de la cuenta como creador
 
-        # 2. Reutilizamos tu función para traer el historial
+        # 2. Traer el historial
         historial = get_all_account_history(account_id)
         
         if not historial:
             continue
 
-        # OJO: Tu función get_all_account_history ordena "DESC" (del más nuevo al más viejo).
-        # Para calcular cómo evolucionó el saldo en el tiempo, debemos invertir la lista (ASC).
+        # Invertir la lista para calcular la evolución cronológica (de más antiguo a más nuevo)
         historial.reverse()
 
         saldo_actual = 0
@@ -46,10 +49,10 @@ def arreglar_saldos_negativos_con_servicios():
 
         # 3. Calcular el punto más bajo del saldo
         for mov in historial:
-            # Tu sistema usa entry_type para saber si suma o resta
-            if mov['entry_type'] == 'CREDIT':  
+            # ACTUALIZACIÓN: Ahora comparamos contra la constante numérica (1)
+            if mov['entry_type'] == CREDIT:  
                 saldo_actual += mov['amount']
-            else: # Asumiendo que es DEBIT
+            else: # Asumiendo que es DEBIT (2)
                 saldo_actual -= mov['amount']
                 
             if saldo_actual < peor_saldo:
@@ -61,15 +64,15 @@ def arreglar_saldos_negativos_con_servicios():
             
             print(f"Cuenta {account_id} detectada con déficit de ${monto_a_depositar}. Intentando ajuste...")
             
-            # Usamos TU función, respetando TODA tu lógica de negocio
+            # Usamos TU función, pasando el entero correspondiente al crédito
             resultado = create_simple_transaction(
                 account_id=account_id,
                 amount=monto_a_depositar,
-                entry_type='credit', # Asumiendo que 'CREDIT' es tu constante de entrada
+                entry_type=CREDIT, # ACTUALIZACIÓN: Pasamos el entero 1
                 description="Ajuste de saldo inicial automático",
-                created_by_user_id=user_id, # O el ID del administrador
+                created_by_user_id=user_id, 
                 transaction_type_id=3, # Depósito
-                created_at=fecha_primera_transaccion # Le pasamos la fecha antigua
+                created_at=fecha_primera_transaccion # Fecha retroactiva
             )
             
             if resultado['success']:
@@ -80,4 +83,5 @@ def arreglar_saldos_negativos_con_servicios():
 
     print(f"\nProceso finalizado. {ajustes_realizados} cuentas ajustadas.")
 
-arreglar_saldos_negativos_con_servicios()
+if __name__ == "__main__":
+    arreglar_saldos_negativos_con_servicios()
