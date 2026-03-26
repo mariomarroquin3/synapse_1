@@ -158,7 +158,7 @@ except:
 create_simple_transaction(
     account_id: int,
     amount: float,
-    entry_type: str,
+    entry_type: int,
     description: str,
     created_by_user_id: int,
     transaction_type_id: int,

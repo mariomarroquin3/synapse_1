@@ -61,8 +61,11 @@ def generate_account_statement_pdf(user_name, account_number, balance, transacti
     elements.append(Spacer(1, 20))
 
     # --- RESUMEN ---
-    total_credits = sum(tx['amount'] for tx in transactions if tx['entry_type'] == 'credit')
-    total_debits = sum(tx['amount'] for tx in transactions if tx['entry_type'] == 'debit')
+    CREDIT = 1
+    DEBIT = 2
+
+    total_credits = sum(tx['amount'] for tx in transactions if tx['entry_type'] == CREDIT)
+    total_debits = sum(tx['amount'] for tx in transactions if tx['entry_type'] == DEBIT)
     initial_balance = balance - (total_credits - total_debits)
 
     summary_data = [
@@ -97,8 +100,9 @@ def generate_account_statement_pdf(user_name, account_number, balance, transacti
     ]]
 
     for i, tx in enumerate(transactions):
-        color = colors.HexColor("#15803d") if tx['entry_type'] == 'credit' else colors.HexColor("#b91c1c")
-        prefix = "+" if tx['entry_type'] == 'credit' else "-"
+        # Actualizado para usar el número 1 (CREDIT)
+        color = colors.HexColor("#15803d") if tx['entry_type'] == CREDIT else colors.HexColor("#b91c1c")
+        prefix = "+" if tx['entry_type'] == CREDIT else "-"
         amount_text = f"<b><font color='{color}'>{prefix}${tx['amount']:,.2f}</font></b>"
         
         # Formateamos fecha y hora

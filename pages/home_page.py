@@ -359,9 +359,12 @@ elif menu == "Historial":
 
             st.markdown("### 📈 Evolución del Saldo")
             if all_history:
+                CREDIT = 1 
+                
                 # Calcular saldo acumulado ordenando desde el inicio para precisión
                 df_ev = pd.DataFrame([
-                    {"fecha": tx["date"], "monto": tx["amount"] if tx["entry_type"] == "credit" else -tx["amount"]}
+                    # Reemplazamos "credit" por la constante numérica
+                    {"fecha": tx["date"], "monto": tx["amount"] if tx["entry_type"] == CREDIT else -tx["amount"]}
                     for tx in sorted(all_history, key=lambda x: x["date"])
                 ])
                 df_ev["saldo"] = df_ev["monto"].cumsum()
@@ -438,13 +441,15 @@ elif menu == "Historial":
                             )
 
                         with col_tx2:
+                            
+                            DEBIT = 2 
 
-                            if tx['entry_type'] == 'debit':
-
+                            if tx['entry_type'] == DEBIT:
                                 st.markdown(
                                     f"### <span style='color:#EF4444;'>-$ {tx['amount']:,.2f}</span>",
                                     unsafe_allow_html=True
                                 )
+                          
 
                             else:
 

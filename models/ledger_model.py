@@ -16,14 +16,14 @@ from typing import Any
 
 
 # ─────────────────────────────────────────────
-# Constantes contables
+# Constantes contables (Actualizadas a IDs numéricos)
 # ─────────────────────────────────────────────
-DEBIT  = "debit"
-CREDIT = "credit"
+CREDIT = 1  # ID 1 = 'credit' (Prioridad alta)
+DEBIT  = 2  # ID 2 = 'debit'
 
 
 def create_ledger_entry(cursor: Any, transaction_id: int, account_id: int,
-                        amount: float, entry_type: str, created_at: datetime | None = None) -> int:
+                        entry_type: int, amount: float, created_at: datetime | None = None) -> int:
     """
     Inserta un registro en ledger_entry usando un cursor existente.
     
@@ -34,8 +34,8 @@ def create_ledger_entry(cursor: Any, transaction_id: int, account_id: int,
         cursor         : Cursor pyodbc existente (no None)
         transaction_id : FK a transaction.Id_transaction
         account_id     : FK a account.Id_account
+        entry_type     : 1 ('credit') o 2 ('debit')
         amount         : Monto del movimiento (siempre positivo)
-        entry_type     : 'debit' o 'credit'
         created_at     : Fecha del movimiento (opcional, default: ahora)
 
     Returns:
@@ -45,8 +45,8 @@ def create_ledger_entry(cursor: Any, transaction_id: int, account_id: int,
         ValueError: Si entry_type o amount son inválidos.
         Exception: Si la inserción falla.
     """
-    if entry_type not in (DEBIT, CREDIT):
-        raise ValueError(f"entry_type debe ser '{DEBIT}' o '{CREDIT}', se recibió: '{entry_type}'")
+    if entry_type not in (CREDIT, DEBIT):
+        raise ValueError(f"entry_type debe ser {CREDIT} (credit) o {DEBIT} (debit), se recibió: {entry_type}")
 
     if amount <= 0:
         raise ValueError(f"El monto debe ser positivo, se recibió: {amount}")
@@ -59,7 +59,7 @@ def create_ledger_entry(cursor: Any, transaction_id: int, account_id: int,
     tx_date = created_at or datetime.now()
 
     print(f"[LEDGER] Insertando entrada → tx={transaction_id}, cuenta={account_id}, "
-          f"monto={amount}, tipo={entry_type}, fecha={tx_date}")
+          f"tipo={entry_type}, monto={amount}, fecha={tx_date}")
 
     cursor.execute(sql, (transaction_id, account_id, entry_type, amount, tx_date))
 
@@ -83,7 +83,7 @@ def get_ledger_entries_by_transaction(transaction_id: int) -> list[dict[str, Any
         transaction_id: FK a transaction.Id_transaction
 
     Returns:
-        Lista de dicts con los campos de ledger_entry.
+        Lista de dicts con los campos de ledger_entry. El campo entry_type ahora devuelve un INT (1 o 2).
     """
     from config.database import get_connection
     
@@ -108,7 +108,7 @@ def get_ledger_entries_by_transaction(transaction_id: int) -> list[dict[str, Any
                 "Id_entry":       row[0],
                 "transaction_id": row[1],
                 "account_id":     row[2],
-                "entry_type":     row[3],
+                "entry_type":     row[3], # Ahora es int (1 o 2)
                 "amount":         row[4],
                 "created_at":     row[5],
             }
@@ -159,7 +159,7 @@ def get_ledger_entry_by_id(entry_id: int) -> dict[str, Any] | None:
             "Id_entry":       row[0],
             "transaction_id": row[1],
             "account_id":     row[2],
-            "entry_type":     row[3], 
+            "entry_type":     row[3], # Ahora es int (1 o 2)
             "amount":         row[4],
             "created_at":     row[5],
         }
