@@ -270,3 +270,17 @@ def get_all_accounts_global() -> list:
         rows = cursor.fetchall()
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in rows] if rows else []
+
+def get_card_kpis_global() -> tuple:
+    """
+    Retorna una tupla (total, activas, inactivas) con conteos globales de tarjetas.
+    Trata valores de Access (True/False/1/0/None) de forma uniforme.
+    """
+    query = 'SELECT [is_active] FROM [card]'
+    with get_cursor() as cursor:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+    total = len(rows)
+    activas = sum(1 for r in rows if r[0] not in (False, 0, None) and r[0] is not False)
+    inactivas = total - activas
+    return total, activas, inactivas

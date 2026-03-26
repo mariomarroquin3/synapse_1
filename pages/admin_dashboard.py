@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # --- 2. IMPORTACIONES LOCALES ---
 from models.user_model import get_users_by_role_category, update_user_status
-from models.account_model import get_accounts_by_user, update_account_status, get_accounts_by_user_ids, get_all_accounts_global
+from models.account_model import get_accounts_by_user, update_account_status, get_accounts_by_user_ids, get_all_accounts_global, get_card_kpis_global
 from models.card_model import get_cards_by_account, update_card_status, get_cards_by_account_ids
 from services.user_service import register_user_with_permissions
 from services.transaction_service import review_transaction
@@ -73,6 +73,15 @@ def get_admin_kpis():
         cursor.execute("SELECT COUNT(*) FROM [user] WHERE role_id IN (1, 3, 4, 5)")
         staff = cursor.fetchone()[0]
         return total_clients, pending, staff
+
+# --- HELPER: Normalización de booleanos (Access devuelve True/False/1/0/None) ---
+def _normalize_bool(val) -> bool:
+    """Convierte valores de Access (True, False, 1, 0, None) a bool de Python."""
+    if val is None:
+        return False
+    if isinstance(val, bool):
+        return val
+    return bool(int(val))
 
 @st.cache_data(ttl=600, max_entries=10)
 def cached_get_users(is_staff: bool):
@@ -410,7 +419,7 @@ if role_id == 3:
 
         tab3_clientes, tab3_personal = st.tabs(["👥 Cuentas de Clientes", "🏢 Cuentas de Personal"])
 
-        def render_account_controls(user_list, search_query_val, is_staff_control=False, estado_filtro="Todas"):
+        def render_account_controls(user_list, search_query_val, is_staff_control=False, estado_filtro="Todas", filtro_tarjeta="Todas"):
             # 1. Filtrado por búsqueda de texto
             if search_query_val:
                 user_list = [
@@ -434,7 +443,7 @@ if role_id == 3:
                 st.info("No hay cuentas registradas en la base de datos.")
                 return
 
-            # --- MÉTRICAS (GLOBALES - basadas en todas las cuentas, no filtradas por usuario) ---
+            # --- KPIs DE CUENTAS (GLOBALES) ---
             t_act = sum(1 for acc in all_accounts_global if acc.get("status_id") == 1)
             t_blo = sum(1 for acc in all_accounts_global if acc.get("status_id") == 2)
             t_sus = sum(1 for acc in all_accounts_global if acc.get("status_id") == 3)
@@ -447,9 +456,17 @@ if role_id == 3:
             m3.metric("🚫 Suspendidas", t_sus)
             m4.metric("⏳ Pendientes", t_pen)
             m5.metric("❌ Rechazadas", t_rec)
+
+            # --- KPIs DE TARJETAS (GLOBALES) ---
+            card_total, card_activas, card_inactivas = get_card_kpis_global()
+            st.markdown("##### 💳 KPIs de Tarjetas")
+            kc1, kc2, kc3 = st.columns(3)
+            kc1.metric("🃏 Total Tarjetas", card_total)
+            kc2.metric("🟢 Tarjetas Activas", card_activas)
+            kc3.metric("🔴 Tarjetas Inactivas", card_inactivas)
             st.divider()
 
-            # 3. Filtrar cuentas según el selector de estado
+            # 3. Filtrar cuentas según el selector de estado de cuenta
             accounts_to_show = all_accounts
             if estado_filtro != "Todas":
                 status_map = {
@@ -463,12 +480,34 @@ if role_id == 3:
                 st.warning(f"No hay cuentas con estado: {estado_filtro}")
                 return
 
+            # 3b. Obtener tarjetas ANTES de filtrar usuarios (necesario para sincronización)
+            acc_ids_pre = [acc['Id_account'] for acc in accounts_to_show]
+            all_cards_pre = get_cards_by_account_ids(acc_ids_pre) if acc_ids_pre else []
+            cards_by_acc_pre = {}
+            for card in all_cards_pre:
+                cards_by_acc_pre.setdefault(card['account_id'], []).append(card)
+
+            # 3c. Si hay filtro de tarjeta activo, sincronizar: sólo mostrar cuentas
+            #     que posean al menos una tarjeta que cumpla el criterio
+            if filtro_tarjeta != "Todas":
+                quiere_activa = (filtro_tarjeta == "Activas")
+                cuentas_con_match = set()
+                for acc in accounts_to_show:
+                    tarjetas_acc = cards_by_acc_pre.get(acc['Id_account'], [])
+                    if any(_normalize_bool(c['is_active']) == quiere_activa for c in tarjetas_acc):
+                        cuentas_con_match.add(acc['Id_account'])
+                accounts_to_show = [a for a in accounts_to_show if a['Id_account'] in cuentas_con_match]
+
+            if not accounts_to_show:
+                st.warning(f"No hay cuentas/tarjetas que coincidan con los filtros seleccionados.")
+                return
+
             # 4. Agrupar datos para la interfaz
             accs_by_user = {}
             for acc in accounts_to_show:
                 accs_by_user.setdefault(acc['user_id'], []).append(acc)
 
-            # Obtener tarjetas de las cuentas filtradas
+            # Obtener tarjetas de las cuentas finalmente filtradas
             acc_ids = [acc['Id_account'] for acc in accounts_to_show]
             all_cards = get_cards_by_account_ids(acc_ids) if acc_ids else []
             cards_by_acc = {}
@@ -552,49 +591,71 @@ if role_id == 3:
                                         st.success(f"Estado de cuenta {ac_num} actualizado")
                                         st.rerun()
 
-                        # --- SECCIÓN DE TARJETAS (Aplicando la misma lógica) ---
+                        # --- SECCIÓN DE TARJETAS ---
                         st.write("💳 **Tarjetas:**")
                         u_cards = cards_by_acc.get(ac_id, [])
                         if u_cards:
                             for card in u_cards:
-                                with st.container(border=True):
-                                    tc1, tc2 = st.columns([3, 1])
-                                    with tc1:
-                                        full_card = str(card["card_number"])
-                                        st.write(f"{full_card}")
-                                    with tc2:
-                                        # Usamos un nombre de variable único para evitar la línea amarilla
-                                        nuevo_estado_card = st.toggle(
-                                            "On", 
-                                            value=bool(card["is_active"]), 
-                                            key=f"tgl_{prefix}_acc_{ac_id}_card_{card['Id_card']}"
-                                        )
-                                        
-                                        if nuevo_estado_card != bool(card["is_active"]):
-                                            if update_card_status(card["Id_card"], nuevo_estado_card):
-                                                # 🛡️ Obtención segura del ID del administrador
-                                                admin_data = st.session_state.get('user_data', {})
-                                                admin_id = admin_data.get('Id_user')
-                                                
-                                                if admin_id:
-                                                    # Definimos la acción según el toggle
-                                                    accion_txt = "10" if nuevo_estado_card else "11"
+                                card_is_active = _normalize_bool(card["is_active"])
+                                full_card = str(card["card_number"])
+
+                                # Determinar si esta tarjeta cumple el filtro de tarjeta actual
+                                if filtro_tarjeta == "Todas":
+                                    destacada = True
+                                elif filtro_tarjeta == "Activas":
+                                    destacada = card_is_active
+                                else:  # Inactivas
+                                    destacada = not card_is_active
+
+                                estado_emoji = "🟢" if card_is_active else "🔴"
+                                estado_label = "Activa" if card_is_active else "Inactiva"
+
+                                # Tarjetas que NO cumplen el filtro se muestran atenuadas
+                                border_flag = destacada
+                                with st.container(border=border_flag):
+                                    if not destacada:
+                                        st.caption(f"{estado_emoji} `{full_card}` — {estado_label} *(no coincide con el filtro)*")
+                                    else:
+                                        tc1, tc2 = st.columns([3, 1])
+                                        with tc1:
+                                            st.markdown(f"{estado_emoji} **`{full_card}`** — <span style='color:{'#16a34a' if card_is_active else '#dc2626'};font-weight:600'>{estado_label}</span>", unsafe_allow_html=True)
+                                        with tc2:
+                                            nuevo_estado_card = st.toggle(
+                                                "Activa",
+                                                value=card_is_active,
+                                                key=f"tgl_{prefix}_acc_{ac_id}_card_{card['Id_card']}"
+                                            )
+                                            
+                                            if nuevo_estado_card != card_is_active:
+                                                if update_card_status(card["Id_card"], nuevo_estado_card):
+                                                    admin_data = st.session_state.get('user_data', {})
+                                                    admin_id = admin_data.get('Id_user')
                                                     
-                                                    log_action(
-                                                        user_id=int(admin_id),
-                                                        action=accion_txt,
-                                                        details=f"Admin cambió estado de la tarjeta {full_card} de la cuenta {ac_num}"
-                                                    )
-                                                
-                                                st.cache_data.clear()
-                                                st.rerun()
+                                                    if admin_id:
+                                                        accion_txt = "10" if nuevo_estado_card else "11"
+                                                        log_action(
+                                                            user_id=int(admin_id),
+                                                            action=accion_txt,
+                                                            details=f"Admin cambió estado de la tarjeta {full_card} de la cuenta {ac_num}"
+                                                        )
+                                                    
+                                                    st.cache_data.clear()
+                                                    st.rerun()
         with tab3_clientes:
             st.subheader("Control de Cuentas de Clientes Regulares")
             
-            estado_filtro_cli = st.selectbox(
-                "Filtrar por estado de cuenta",
-                ["Todas", "Activas", "Bloqueadas", "Suspendidas", "Pendientes", "Rechazadas"], # Añadidos nuevos estados
-                key="filter_estado_cli"
+            fcol1, fcol2 = st.columns(2)
+            with fcol1:
+                estado_filtro_cli = st.selectbox(
+                    "Filtrar por estado de cuenta",
+                    ["Todas", "Activas", "Bloqueadas", "Suspendidas", "Pendientes", "Rechazadas"],
+                    key="filter_estado_cli"
+                )
+            with fcol2:
+                filtro_tarjeta_cli = st.selectbox(
+                    "💳 Filtrar por estado de tarjeta",
+                    ["Todas", "Activas", "Inactivas"],
+                    key="filter_tarjeta_cli"
                 )
             
             clients_for_control = cached_get_users(is_staff=False)
@@ -603,16 +664,25 @@ if role_id == 3:
                 clients_for_control if clients_for_control else [],
                 search_control_cli,
                 is_staff_control=False,
-                estado_filtro=estado_filtro_cli
+                estado_filtro=estado_filtro_cli,
+                filtro_tarjeta=filtro_tarjeta_cli
                 )
 
         with tab3_personal:
             st.subheader("Control de Cuentas del Personal")
             
-            estado_filtro_stf = st.selectbox(
-                "Filtrar por estado de cuenta",
-                ["Todas", "Activas", "Bloqueadas", "Suspendidas", "Pendientes", "Rechazadas"], # Añadidos nuevos estados
-                key="filter_estado_stf"
+            fcol3, fcol4 = st.columns(2)
+            with fcol3:
+                estado_filtro_stf = st.selectbox(
+                    "Filtrar por estado de cuenta",
+                    ["Todas", "Activas", "Bloqueadas", "Suspendidas", "Pendientes", "Rechazadas"],
+                    key="filter_estado_stf"
+                )
+            with fcol4:
+                filtro_tarjeta_stf = st.selectbox(
+                    "💳 Filtrar por estado de tarjeta",
+                    ["Todas", "Activas", "Inactivas"],
+                    key="filter_tarjeta_stf"
                 )
                 
             staff_for_control = cached_get_users(is_staff=True)
@@ -622,7 +692,8 @@ if role_id == 3:
                 staff_for_control if staff_for_control else [],
                 search_control_stf,
                 is_staff_control=True,
-                estado_filtro=estado_filtro_stf
+                estado_filtro=estado_filtro_stf,
+                filtro_tarjeta=filtro_tarjeta_stf
                 )
 
     def get_pending_approvals():
