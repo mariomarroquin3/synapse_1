@@ -257,16 +257,3 @@ def get_accounts_by_user_ids(user_ids: list) -> list:
         rows = cursor.fetchall()
         columns = [col[0] for col in cursor.description]
         return [dict(zip(columns, row)) for row in rows] if rows else []
-
-def get_all_accounts_global() -> list:
-    """
-    Obtiene TODAS las cuentas de la tabla [account] sin filtros.
-    Utilizado para calcular KPIs globales en el dashboard del admin.
-    Retorna lista de diccionarios con todas las columnas de la tabla.
-    """
-    query = 'SELECT * FROM [account]'
-    with get_cursor() as cursor:
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        columns = [col[0] for col in cursor.description]
-        return [dict(zip(columns, row)) for row in rows] if rows else []

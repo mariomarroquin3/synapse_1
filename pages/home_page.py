@@ -572,7 +572,7 @@ elif menu == "Tarjetas":
                                 else:
                                     st.error(f"Error en renovación: {res.get('error')}")
                     else:
-                        st.info("La tarjeta está vigente. No es necesario renovarla por ahora.")
+                        st.info("La gestión de estado (bloqueo) está temporalmente deshabilitada.")
                     # BOTÓN GENERAR Y DESCARGAR TARJETA
                     if st.button("📄 Ver / Imprimir Tarjeta (PDF)", key=f"print_card_{card_id}"):
                         st.session_state[f"show_download_{card_id}"] = True
